@@ -18,20 +18,24 @@ pub struct LyricsResponse {
 }
 
 pub async fn fetch_lyrics(
-    artist: &str,
-    title: &str,
+    artist: String,
+    title: String,
     duration: f64,
 ) -> Option<(LyricsResponse, String)> {
-    let encoded_artist = urlencoding::encode(artist);
-    let encoded_title = urlencoding::encode(title);
+    let encoded_artist = urlencoding::encode(&artist);
+    let encoded_title = urlencoding::encode(&title);
+
     let url = format!(
         "https://lrclib.net/api/search?artist_name={}&track_name={}&duration={}",
         encoded_artist, encoded_title, duration
     );
+
     println!("Fetching lyrics: {}", url);
+
     let response_text = reqwest::get(url).await.ok()?.text().await.ok()?;
     let lyrics_response_list =
         serde_json::from_str::<Vec<LyricsResponse>>(response_text.as_str()).ok()?;
+
     for lyrics_response in lyrics_response_list {
         if let Some(synced_lyrics) = lyrics_response.synced_lyrics.clone() {
             return Some((lyrics_response, synced_lyrics));
