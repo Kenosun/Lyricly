@@ -19,6 +19,7 @@ function App() {
   const [synced, setSynced] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [currentLines, setCurrentLines] = useState<string[]>([]);
+  const [currentPosition, setCurrentPosition] = useState<number>(0);
   const parsedLyrics = useMemo(() => parseLyrics(lyrics), [lyrics]);
 
   // start listening to the event
@@ -40,21 +41,47 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+
+    listen<number>("update_position", (event) => {
+      setCurrentPosition(event.payload);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    // trigger backend
+    invoke("fetch_position_loop").catch(console.error);
+
+    // cleanup function to unsubscribe when component unmounts
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
   // fetch lyrics
   useEffect(() => {
     if (!media) return;
+
+    // reset lyrics
     setLyrics("");
     setCurrentLines([]);
     setSynced(false);
     setLoading(true);
+    let cancelled = false;
 
     const fetchLyrics = async () => {
       setLoading(true);
+
       const result = await fetchLyricsResponse(
         media.artist,
         media.title,
         media.duration
       );
+
+      // ignore outdated results
+      if (cancelled) return;
+
       setLoading(false);
       if (result) {
         const { lyricsResponse, synced } = result;
@@ -69,15 +96,17 @@ function App() {
         setLyrics("No lyrics found.");
       }
     };
-
     fetchLyrics();
+    return () => {
+      cancelled = true;
+    };
   }, [media]);
 
   // update current lines
   useEffect(() => {
     if (!media) return;
     let start = performance.now();
-    let offset = media.position;
+    let offset = currentPosition ?? media.position;
 
     const update = () => {
       const elapsed = performance.now() - start;
@@ -108,7 +137,7 @@ function App() {
 
     const id = requestAnimationFrame(update);
     return () => cancelAnimationFrame(id);
-  }, [media, parsedLyrics]);
+  }, [media, parsedLyrics, currentPosition]);
 
   return (
     <main className="container">
@@ -117,7 +146,7 @@ function App() {
           <p>
             {media.artist} - {media.title}
           </p>
-          {loading ? (
+          {loading || !lyrics ? (
             <p>Loading lyrics...</p>
           ) : synced ? (
             <pre style={{ textAlign: "center", lineHeight: "1.6em" }}>

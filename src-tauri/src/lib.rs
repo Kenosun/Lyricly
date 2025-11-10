@@ -80,11 +80,48 @@ async fn fetch_media_loop(app: tauri::AppHandle) {
     });
 }
 
+#[tauri::command]
+async fn fetch_position_loop(app: tauri::AppHandle) {
+    async_runtime::spawn(async move {
+        // event has to match with frontend
+        let media_event = "update_position";
+
+        // initialize media manager
+        let manager_result = GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+        if manager_result.is_err() {
+            let _ = app.emit(media_event, "Failed to request media manager");
+            return;
+        }
+        let manager = match manager_result.unwrap().await {
+            Ok(m) => m,
+            Err(_) => {
+                let _ = app.emit(media_event, "Failed to get session manager");
+                return;
+            }
+        };
+
+        loop {
+            // get current media
+            if let Ok(session) = manager.GetCurrentSession() {
+                if let Ok(timeline) = session.GetTimelineProperties() {
+                    // emit media position in ms
+                    let position = timeline.Position().unwrap().Duration as f64 / 10_000.0;
+                    let _ = app.emit(media_event, position);
+                }
+            }
+            sleep(Duration::from_millis(1)).await;
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![fetch_media_loop])
+        .invoke_handler(tauri::generate_handler![
+            fetch_media_loop,
+            fetch_position_loop
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
