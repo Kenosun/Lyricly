@@ -51,13 +51,12 @@ async fn fetch_media_loop(app: tauri::AppHandle) {
                             .to_string_lossy();
                         let current_media = format!("{} - {}", artist, title);
                         if let Ok(timeline) = session.GetTimelineProperties() {
-                            // calculate media position and duration
-                            let position =
-                                timeline.Position().unwrap().Duration as f64 / 10_000_000.0;
+                            // calculate media position and duration in ms
+                            let position = timeline.Position().unwrap().Duration as f64 / 10_000.0;
                             let duration = (timeline.EndTime().unwrap().Duration
                                 - timeline.StartTime().unwrap().Duration)
                                 as f64
-                                / 10_000_000.0;
+                                / 10_000.0;
 
                             // emit only if media changed
                             if current_media != last_media {

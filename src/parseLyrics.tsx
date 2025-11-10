@@ -1,3 +1,4 @@
+// parse lyrics into an array of time in ms and text
 export function parseLyrics(lyrics: string) {
   const lines = lyrics.split("\n");
   const result = [];
@@ -8,14 +9,17 @@ export function parseLyrics(lyrics: string) {
 
     const startBracket = line.indexOf("[");
     const endBracket = line.indexOf("]");
-    if (startBracket && endBracket) {
+
+    if (startBracket !== -1 && endBracket !== -1) {
       const timestamp = line.slice(startBracket + 1, endBracket);
       const text = line.slice(endBracket + 1).trim();
 
       const colonIndex = timestamp.indexOf(":");
       const minutes = parseInt(timestamp.slice(0, colonIndex));
       const seconds = parseFloat(timestamp.slice(colonIndex + 1));
-      const time = minutes * 60 + seconds;
+
+      const time = (minutes * 60 + seconds) * 1000;
+
       result.push({ time, text });
     }
   }
