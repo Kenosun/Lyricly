@@ -103,6 +103,9 @@ body {
   color: #1f2937;
   opacity: 0.6;
   transform-origin: center;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
 }
 
 .lyric-line.active {
@@ -115,11 +118,12 @@ body {
 
 /* non-synced plain lyrics */
 pre {
+  font-size: 1.2rem;
   white-space: pre-wrap;
-  text-align: left;
+  text-align: center;
   font-family: inherit;
   margin: 0;
-  color: #111827;
+  color: #94aac9;
 }
 
 /* spinner */
