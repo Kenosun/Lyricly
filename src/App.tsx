@@ -59,15 +59,18 @@ function App() {
     };
   }, []);
 
-  // fetch lyrics
+  // reset everything when media changes
   useEffect(() => {
-    if (!media) return;
-
-    // reset lyrics
+    setCurrentPosition(0);
     setLyrics("");
     setCurrentLines([]);
     setSynced(false);
     setLoading(true);
+  }, [media]);
+
+  // fetch lyrics
+  useEffect(() => {
+    if (!media) return;
     let cancelled = false;
 
     const fetchLyrics = async () => {
@@ -104,7 +107,9 @@ function App() {
 
   // update current lines
   useEffect(() => {
-    if (!media) return;
+    if (!media || parsedLyrics.length === 0) return;
+    let id: number;
+
     let start = performance.now();
     let offset = currentPosition ?? media.position;
 
@@ -132,10 +137,10 @@ function App() {
         setCurrentLines(currentLines);
       }
 
-      requestAnimationFrame(update);
+      id = requestAnimationFrame(update);
     };
 
-    const id = requestAnimationFrame(update);
+    id = requestAnimationFrame(update);
     return () => cancelAnimationFrame(id);
   }, [media, parsedLyrics, currentPosition]);
 
