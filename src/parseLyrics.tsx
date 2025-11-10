@@ -12,7 +12,11 @@ export function parseLyrics(lyrics: string) {
 
     if (startBracket !== -1 && endBracket !== -1) {
       const timestamp = line.slice(startBracket + 1, endBracket);
-      const text = line.slice(endBracket + 1).trim();
+      let text = line.slice(endBracket + 1).trim();
+
+      if (text === "") {
+        text = "♪";
+      }
 
       const colonIndex = timestamp.indexOf(":");
       const minutes = parseInt(timestamp.slice(0, colonIndex));
