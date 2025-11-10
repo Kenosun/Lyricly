@@ -148,31 +148,46 @@ function App() {
   return (
     <main className="container">
       {media ? (
-        <>
-          <p>
-            {media.artist} - {media.title}
-          </p>
-          {loading || !lyrics ? (
-            <p>Loading lyrics...</p>
-          ) : synced ? (
-            <pre style={{ textAlign: "center", lineHeight: "1.6em" }}>
-              {currentLines.map((line, i) => (
-                // highlight the current line
-                <div
-                  key={i}
-                  style={{
-                    opacity: i === highlightedIndex ? 1 : 0.5,
-                    fontWeight: i === highlightedIndex ? "bold" : "normal",
-                  }}
-                >
-                  {line}
+        <div className="card" role="region" aria-label="Now playing">
+          <div className="meta">
+            <div className="title">
+              {media.artist} — {media.title}
+            </div>
+            {loading || !lyrics ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: 160,
+                }}
+              >
+                <div className="spinner" />
+                <div className="hint">Fetching lyrics…</div>
+              </div>
+            ) : synced ? (
+              <div className="lyrics">
+                <div className="lyric-list">
+                  {currentLines.map((line, i) => (
+                    <div
+                      key={i}
+                      className={`lyric-line ${
+                        i === highlightedIndex ? "active" : ""
+                      }`}
+                    >
+                      {line}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </pre>
-          ) : (
-            <pre>{lyrics}</pre>
-          )}
-        </>
+              </div>
+            ) : (
+              <div className="lyrics">
+                <pre>{lyrics}</pre>
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         <p>Nothing is playing.</p>
       )}

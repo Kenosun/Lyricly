@@ -1,116 +1,176 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
+/* Updated/app styles for a nicer UI */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap");
 
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
-}
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
+  --bg-1: #f6f8ff;
+  --bg-2: #eef6ff;
+  --card-bg: rgba(255, 255, 255, 0.75);
+  --accent: #5966ff;
+  --muted: #6b7280;
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.6);
+}
 
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+/* subtle radial gradient background */
+body {
+  background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+  min-height: 97.41666vh;
 }
 
+/* container centers the card */
 .container {
   margin: 0;
-  padding-top: 10vh;
+  padding-top: 6vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
   text-align: center;
+  gap: 1rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
+/* card */
+.card {
+  width: min(920px, 80vw);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8),
+    rgba(250, 250, 252, 0.7)
+  );
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(20, 24, 40, 0.12);
+  padding: 2rem;
+  display: inline;
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid rgba(100, 110, 255, 0.08);
+  backdrop-filter: blur(8px) saturate(120%);
 }
 
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
+/* fallback single column on small screens */
+@media (max-width: 720px) {
+  .card {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
 }
 
-.row {
+/* metadata and title */
+.meta {
+  text-align: left;
+  padding: 0.25rem 0;
+}
+
+.title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #bac8e0;
+  margin-bottom: 0.15rem;
+}
+
+/* lyrics area */
+.lyrics {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.6),
+    rgba(250, 250, 252, 0.55)
+  );
+  border: 1px solid rgba(20, 24, 40, 0.03);
+  overflow: hidden;
+}
+
+/* lines */
+.lyric-list {
   display: flex;
+  height: 55vh;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
   justify-content: center;
+  padding: 1.5rem 0;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+.lyric-line {
+  font-size: 1.4rem;
+  transition: all 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  color: #1f2937;
+  opacity: 0.6;
+  transform-origin: center;
 }
 
-a:hover {
-  color: #535bf2;
+.lyric-line.active {
+  opacity: 1;
+  font-weight: 700;
+  transform: scale(1.03);
+  color: var(--accent);
+  text-shadow: 0 2px 10px rgba(89, 102, 255, 0.12);
 }
 
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+/* non-synced plain lyrics */
+pre {
+  white-space: pre-wrap;
+  text-align: left;
   font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  margin: 0;
+  color: #111827;
 }
 
-button {
-  cursor: pointer;
+/* spinner */
+.spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 4px solid rgba(0, 0, 0, 0.06);
+  border-top-color: var(--accent);
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
+/* small helper text */
+.hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
 }
 
-#greet-input {
-  margin-right: 5px;
-}
-
+/* dark mode tweaks */
 @media (prefers-color-scheme: dark) {
   :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+    --bg-1: #081025;
+    --bg-2: #071428;
+    --card-bg: rgba(20, 24, 40, 0.48);
+    --accent: #6ad3ff;
+    --muted: #9aa4b2;
   }
-
-  a:hover {
-    color: #24c8db;
+  .card {
+    background: linear-gradient(
+      180deg,
+      rgba(8, 12, 24, 0.6),
+      rgba(6, 10, 20, 0.6)
+    );
+    border: 1px solid rgba(120, 180, 255, 0.06);
   }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .lyrics {
+    background: rgba(255, 255, 255, 0.03);
   }
-  button:active {
-    background-color: #0f0f0f69;
+  .lyric-line {
+    color: #dbeafe;
+    opacity: 0.7;
+  }
+  .lyric-line.active {
+    color: var(--accent);
+    text-shadow: none;
   }
 }
