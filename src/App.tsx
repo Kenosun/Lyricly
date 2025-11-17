@@ -1,9 +1,10 @@
 import "./App.css";
+import { fetchLyrics } from "./fetchLyrics";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { useEffect, useMemo, useState } from "react";
-import { fetchLyricsResponse } from "./fetchLyricsResponse";
 import { parseLyrics } from "./parseLyrics";
+import { romanizeLyrics } from "./romanizeLyrics";
+import { useEffect, useState } from "react";
 
 interface Media {
   artist: string;
@@ -21,7 +22,9 @@ function App() {
   const [currentLines, setCurrentLines] = useState<string[]>([]);
   const [currentPosition, setCurrentPosition] = useState<number>(0);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
-  const parsedLyrics = useMemo(() => parseLyrics(lyrics), [lyrics]);
+  const [parsedLyrics, setParsedLyrics] = useState<
+    { time: number; text: string }[]
+  >([]);
 
   // start listening to the event
   useEffect(() => {
@@ -60,24 +63,24 @@ function App() {
     };
   }, []);
 
-  // reset everything when media changes
+  // handle lyrics
   useEffect(() => {
-    setCurrentPosition(0);
     setLyrics("");
-    setCurrentLines([]);
     setSynced(false);
     setLoading(true);
-  }, [media]);
+    setCurrentLines([]);
+    setCurrentPosition(0);
+    setHighlightedIndex(0);
+    setParsedLyrics([]);
+    console.log("reset everything");
 
-  // fetch lyrics
-  useEffect(() => {
     if (!media) return;
     let cancelled = false;
 
-    const fetchLyrics = async () => {
+    const handleLyrics = async () => {
       setLoading(true);
 
-      const result = await fetchLyricsResponse(
+      const result = await fetchLyrics(
         media.artist,
         media.title,
         media.duration
@@ -86,21 +89,32 @@ function App() {
       // ignore outdated results
       if (cancelled) return;
 
-      setLoading(false);
       if (result) {
         const { lyricsResponse, synced } = result;
-        if (synced) {
-          setSynced(true);
-          setLyrics(lyricsResponse.syncedLyrics);
-        } else {
-          setSynced(false);
-          setLyrics(lyricsResponse.plainLyrics);
-        }
+        const fetchedText = synced
+          ? lyricsResponse.syncedLyrics
+          : lyricsResponse.plainLyrics;
+        setSynced(synced);
+        setLyrics(fetchedText);
+        console.log("fetched lyrics");
+
+        // romanize lyrics
+        const romanizeResult = await romanizeLyrics(fetchedText);
+        if (cancelled) return;
+        setLyrics(romanizeResult);
+        console.log("romanized lyrics");
+
+        // parse lyrics
+        const parseResult = parseLyrics(romanizeResult);
+        if (cancelled) return;
+        setParsedLyrics(parseResult);
+        console.log("parsed lyrics");
       } else {
         setLyrics("No lyrics found.");
       }
+      setLoading(false);
     };
-    fetchLyrics();
+    handleLyrics();
     return () => {
       cancelled = true;
     };
@@ -140,7 +154,6 @@ function App() {
 
       id = requestAnimationFrame(update);
     };
-
     id = requestAnimationFrame(update);
     return () => cancelAnimationFrame(id);
   }, [media, parsedLyrics, currentPosition]);

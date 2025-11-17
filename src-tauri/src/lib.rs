@@ -1,7 +1,11 @@
+use lindera::{
+    dictionary::load_dictionary, mode::Mode, segmenter::Segmenter, tokenizer::Tokenizer,
+};
 use serde::Serialize;
 use std::time::Duration;
 use tauri::{async_runtime, Emitter};
 use tokio::time::sleep;
+use wana_kana::ConvertJapanese;
 use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
 
 #[derive(Clone, Serialize)]
@@ -114,13 +118,41 @@ async fn fetch_position_loop(app: tauri::AppHandle) {
     });
 }
 
+#[tauri::command]
+fn romanize_japanese_lyrics(lyrics: String) -> String {
+    let dictionary = load_dictionary("embedded://unidic").unwrap();
+    let segmenter = Segmenter::new(Mode::Normal, dictionary, None).keep_whitespace(true);
+    let tokenizer = Tokenizer::new(segmenter);
+    let mut tokens = tokenizer.tokenize(&lyrics).unwrap();
+    let mut kana_output = String::new();
+
+    // convert lyrics to kana
+    for token in tokens.iter_mut() {
+        if let Some(reading) = token.get_detail(10) {
+            kana_output.push_str(&reading);
+        } else if let Some(phonetic) = token.get_detail(13) {
+            kana_output.push_str(&phonetic);
+        } else if let Some(phonetic_base) = token.get_detail(15) {
+            kana_output.push_str(&phonetic_base);
+        } else {
+            kana_output.push_str(&token.surface);
+        }
+    }
+
+    // convert kana to romaji
+    let result = kakasi::convert(kana_output).hiragana;
+    let romanized_lyrics = result.to_romaji();
+    return romanized_lyrics;
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             fetch_media_loop,
-            fetch_position_loop
+            fetch_position_loop,
+            romanize_japanese_lyrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

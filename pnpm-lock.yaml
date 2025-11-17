@@ -14,6 +14,9 @@ importers:
       '@tauri-apps/plugin-opener':
         specifier: ^2
         version: 2.5.2
+      hangul-romanization:
+        specifier: ^1.0.1
+        version: 1.0.1
       react:
         specifier: ^19.1.0
         version: 19.2.0
@@ -572,6 +575,9 @@ packages:
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
+
+  hangul-romanization@1.0.1:
+    resolution: {integrity: sha512-Nh67VGRK0Zet2JRDWII4/RW004XSZyWVySSurM9PEAR1p+7/5Kr8OrrcSYQcQhyGCcBEKyQm98xd+rRnyO0uXg==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -1134,6 +1140,8 @@ snapshots:
     optional: true
 
   gensync@1.0.0-beta.2: {}
+
+  hangul-romanization@1.0.1: {}
 
   js-tokens@4.0.0: {}
 
