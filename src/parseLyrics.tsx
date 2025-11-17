@@ -15,7 +15,11 @@ export function parseLyrics(lyrics: string) {
       let text = line.slice(endBracket + 1).trim();
 
       if (text === "") {
+        // replace instrumental parts with ♪
         text = "♪";
+      } else {
+        // capitalize first character of the text
+        text = text.charAt(0).toUpperCase() + text.slice(1);
       }
 
       const colonIndex = timestamp.indexOf(":");
