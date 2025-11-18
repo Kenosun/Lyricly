@@ -1,7 +1,9 @@
 use lindera::{
     dictionary::load_dictionary, mode::Mode, segmenter::Segmenter, tokenizer::Tokenizer,
 };
+use once_cell::sync::Lazy;
 use serde::Serialize;
+use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{async_runtime, Emitter};
 use tokio::time::sleep;
@@ -118,11 +120,16 @@ async fn fetch_position_loop(app: tauri::AppHandle) {
     });
 }
 
-#[tauri::command]
-fn romanize_japanese_lyrics(lyrics: String) -> String {
+static TOKENIZER: Lazy<Mutex<Tokenizer>> = Lazy::new(|| {
     let dictionary = load_dictionary("embedded://unidic").unwrap();
     let segmenter = Segmenter::new(Mode::Normal, dictionary, None).keep_whitespace(true);
     let tokenizer = Tokenizer::new(segmenter);
+    Mutex::new(tokenizer)
+});
+
+#[tauri::command]
+fn romanize_japanese_lyrics(lyrics: String) -> String {
+    let tokenizer = TOKENIZER.lock().unwrap();
     let mut tokens = tokenizer.tokenize(&lyrics).unwrap();
     let mut kana_output = String::new();
 
