@@ -1,3 +1,4 @@
+mod fetch_lyrics;
 mod fetch_media;
 mod fetch_position;
 mod romanize_japanese;
@@ -8,6 +9,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            fetch_lyrics::fetch_lyrics,
             fetch_media::fetch_media_loop,
             fetch_position::fetch_position_loop,
             romanize_japanese::romanize_japanese_lyrics

@@ -1,10 +1,19 @@
 import "./App.css";
-import { fetchLyrics } from "./fetchLyrics";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { parseLyrics } from "./parseLyrics";
 import { romanizeLyrics } from "./romanizeLyrics";
 import { useEffect, useState } from "react";
+
+interface LyricsResponse {
+  trackName: string;
+  artistName: string;
+  albumName: string;
+  duration: number;
+  plainLyrics: string;
+  syncedLyrics: string;
+  synced: boolean;
+}
 
 interface Media {
   artist: string;
@@ -80,21 +89,21 @@ function App() {
     const handleLyrics = async () => {
       setLoading(true);
 
-      const result = await fetchLyrics(
-        media.artist,
-        media.title,
-        media.duration
-      );
+      // fetch lyrics
+      const result = await invoke<LyricsResponse>("fetch_lyrics", {
+        artist: media.artist,
+        title: media.title,
+        duration: media.duration,
+      });
 
       // ignore outdated results
       if (cancelled) return;
 
       if (result) {
-        const { lyricsResponse, synced } = result;
-        const fetchedText = synced
-          ? lyricsResponse.syncedLyrics
-          : lyricsResponse.plainLyrics;
-        setSynced(synced);
+        const fetchedText = result.synced
+          ? result.syncedLyrics
+          : result.plainLyrics;
+        setSynced(result.synced);
         setLyrics(fetchedText);
         console.log("fetched lyrics");
 
