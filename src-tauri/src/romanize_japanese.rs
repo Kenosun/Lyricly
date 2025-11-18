@@ -12,8 +12,8 @@ static TOKENIZER: Lazy<Mutex<Tokenizer>> = Lazy::new(|| {
     Mutex::new(tokenizer)
 });
 
-#[tauri::command]
-pub fn romanize_japanese_lyrics(lyrics: String) -> String {
+#[tauri::command(async)]
+pub async fn romanize_japanese_lyrics(lyrics: String) -> String {
     let tokenizer = TOKENIZER.lock().unwrap();
     let mut tokens = tokenizer.tokenize(&lyrics).unwrap();
     let mut kana_output = String::new();
