@@ -1,7 +1,8 @@
 mod detect_language;
 mod fetch_lyrics;
-mod fetch_media;
-mod fetch_position;
+mod fetch_media_loop;
+mod fetch_position_loop;
+mod parse_lyrics;
 mod romanize_japanese;
 mod romanize_lyrics;
 
@@ -12,9 +13,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             fetch_lyrics::fetch_lyrics,
-            fetch_media::fetch_media_loop,
-            fetch_position::fetch_position_loop,
-            romanize_lyrics::romanize_lyrics
+            fetch_media_loop::fetch_media_loop,
+            fetch_position_loop::fetch_position_loop,
+            romanize_lyrics::romanize_lyrics,
+            parse_lyrics::parse_lyrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
