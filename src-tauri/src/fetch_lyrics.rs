@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LyricsResponse {
     #[serde(default)]
@@ -36,26 +36,41 @@ pub async fn fetch_lyrics(
 
     if let Some(response) = reqwest::get(url).await.ok() {
         if let Some(response_text) = response.text().await.ok() {
-            if let Some(lyrics_response_list) =
-                serde_json::from_str::<Vec<LyricsResponse>>(response_text.as_str()).ok()
-            {
-                // check if synced lyrics are available
-                for mut lyrics_response in lyrics_response_list.clone() {
-                    if lyrics_response.synced_lyrics.is_some() {
-                        lyrics_response.synced = true;
-                        return Ok(lyrics_response.clone());
+            if let Ok(lyrics_list) = serde_json::from_str::<Vec<LyricsResponse>>(&response_text) {
+                let mut best_synced: Option<LyricsResponse> = None;
+                let mut best_plain: Option<LyricsResponse> = None;
+                let mut smallest_diff_synced = f64::MAX;
+                let mut smallest_diff_plain = f64::MAX;
+
+                // find best fitting lyrics based on duration
+                for mut lyrics in lyrics_list {
+                    if let Some(lyrics_duration) = lyrics.duration {
+                        let diff = (lyrics_duration - duration_in_seconds).abs();
+
+                        if lyrics.synced_lyrics.is_some() {
+                            if diff < smallest_diff_synced {
+                                smallest_diff_synced = diff;
+                                lyrics.synced = true;
+                                best_synced = Some(lyrics);
+                            }
+                        } else if lyrics.plain_lyrics.is_some() {
+                            if diff < smallest_diff_plain {
+                                smallest_diff_plain = diff;
+                                lyrics.synced = false;
+                                best_plain = Some(lyrics);
+                            }
+                        }
                     }
                 }
 
-                // fallback to plain lyrics
-                for mut lyrics_response in lyrics_response_list {
-                    if lyrics_response.plain_lyrics.is_some() {
-                        lyrics_response.synced = false;
-                        return Ok(lyrics_response);
-                    }
+                // prefer synced lyrics if available
+                if let Some(lyrics) = best_synced {
+                    return Ok(lyrics);
+                } else if let Some(lyrics) = best_plain {
+                    return Ok(lyrics);
                 }
             }
         }
     }
-    return Err(());
+    Err(())
 }
