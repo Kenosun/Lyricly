@@ -2,7 +2,6 @@ import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { parseLyrics } from "./parseLyrics";
-import { romanizeLyrics } from "./romanizeLyrics";
 import { useEffect, useState } from "react";
 
 interface LyricsResponse {
@@ -108,7 +107,9 @@ function App() {
         console.log("fetched lyrics");
 
         // romanize lyrics
-        const romanizeResult = await romanizeLyrics(fetchedText);
+        const romanizeResult = await invoke<string>("romanize_lyrics", {
+          lyrics: fetchedText,
+        });
         if (cancelled) return;
         setLyrics(romanizeResult);
         console.log("romanized lyrics");

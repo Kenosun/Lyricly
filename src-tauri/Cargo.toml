@@ -31,4 +31,5 @@ lindera = {version = "1.4.1", features = ["embedded-unidic"] }
 once_cell = "1.21.3"
 kakasi = "0.1.0"
 ib-romaji = "0.1.2"
+hangeul = { git = "https://github.com/zaeleus/hangeul.git", version = "0.1.0" }
 
