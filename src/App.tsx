@@ -18,6 +18,8 @@ interface Media {
   title: string;
   duration: number;
   position: number;
+  album: string;
+  thumbnail: string;
 }
 
 function App() {
@@ -70,8 +72,9 @@ function App() {
     };
   }, []);
 
-  // handle lyrics
+  // on media change
   useEffect(() => {
+    // reset everything
     setLyrics("");
     setSynced(false);
     setLoading(true);
@@ -177,8 +180,20 @@ function App() {
       {media ? (
         <div className="card" role="region" aria-label="Now playing">
           <div className="meta">
-            <div className="title">
-              {media.artist} — {media.title}
+            <div className="album-section">
+              {media.thumbnail && (
+                <img
+                  className="album-thumbnail"
+                  src={`data:image/jpeg;base64,${media.thumbnail}`}
+                  alt="thumbnail"
+                />
+              )}
+              <div className="track-info">
+                <div className="title">
+                  {media.artist} — {media.title}
+                </div>
+                <div className="album-name">{media.album}</div>
+              </div>
             </div>
             {loading || !lyrics ? (
               <div
@@ -221,5 +236,4 @@ function App() {
     </main>
   );
 }
-
 export default App;
