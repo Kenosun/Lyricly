@@ -99,7 +99,6 @@ body {
 /* lyrics area */
 .lyrics {
   grid-column: 1 / -1;
-  margin-top: 0.5rem;
   padding: 0.5rem 1.5rem;
   border-radius: 10px;
   background: linear-gradient(

@@ -202,7 +202,7 @@ function App() {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 8,
-                  padding: 160,
+                  padding: 130,
                 }}
               >
                 <div className="spinner" />
