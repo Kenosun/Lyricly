@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LyricsResponse {
     #[serde(default)]
@@ -17,6 +17,8 @@ pub struct LyricsResponse {
     pub synced_lyrics: Option<String>,
     #[serde(default)]
     pub synced: bool,
+    #[serde(default)]
+    pub failed: bool,
 }
 
 #[tauri::command(async)]
@@ -64,13 +66,18 @@ pub async fn fetch_lyrics(
                 }
 
                 // prefer synced lyrics if available
-                if let Some(lyrics) = best_synced {
+                if let Some(mut lyrics) = best_synced {
+                    lyrics.failed = false;
                     return Ok(lyrics);
-                } else if let Some(lyrics) = best_plain {
+                } else if let Some(mut lyrics) = best_plain {
+                    lyrics.failed = false;
                     return Ok(lyrics);
                 }
             }
         }
     }
-    Err(())
+    Ok(LyricsResponse {
+        failed: true,
+        ..Default::default()
+    })
 }

@@ -11,6 +11,7 @@ interface LyricsResponse {
   plainLyrics: string;
   syncedLyrics: string;
   synced: boolean;
+  failed: boolean;
 }
 
 interface Media {
@@ -100,7 +101,9 @@ function App() {
       // ignore outdated results
       if (cancelled) return;
 
-      if (result) {
+      if (result.failed) {
+        setLyrics("No lyrics found.");
+      } else {
         const fetchedText = result.synced
           ? result.syncedLyrics
           : result.plainLyrics;
@@ -126,8 +129,6 @@ function App() {
         if (cancelled) return;
         setParsedLyrics(parseResult);
         console.log("parsed lyrics");
-      } else {
-        setLyrics("No lyrics found.");
       }
       setLoading(false);
     };
