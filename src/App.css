@@ -24,13 +24,10 @@ body {
 }
 
 .card {
-  width: 90vw;
-  height: 47vw;
+  width: clamp(0px, 80vw, 6400px);
+  height: clamp(0px, 78vh, 3200px);
   border-radius: 32px;
-  padding-left: 4.5rem;
-  padding-right: 4.5rem;
-  padding-top: 3rem;
-  padding-bottom: 3rem;
+  padding: clamp(1.5rem, 4vw, 4.5rem);
   backdrop-filter: blur(8px) saturate(120%);
   background: linear-gradient(
     180deg,
@@ -38,6 +35,8 @@ body {
     rgba(6, 10, 20, 0.6)
   );
   border: 1px solid rgba(120, 180, 255, 0.06);
+  display: flex;
+  flex-direction: column;
 }
 
 .meta {
@@ -63,7 +62,7 @@ body {
   display: flex;
   gap: 24px;
   align-items: flex-start;
-  margin-bottom: 64px;
+  margin-bottom: clamp(1rem, 2vw, 2rem);
 }
 
 .album-thumbnail {
@@ -85,9 +84,9 @@ body {
 
 .lyric-list {
   display: flex;
-  height: 64vh;
+  height: clamp(0px, 51vh, 860px);
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
   justify-content: center;
 }
 
@@ -114,11 +113,11 @@ pre {
 }
 
 .loading {
-  display: "flex";
-  flex-direction: "column";
-  align-items: "center";
-  gap: 8;
-  padding: 16vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: clamp(2rem, 16vw, 16rem);
 }
 
 .spinner {
