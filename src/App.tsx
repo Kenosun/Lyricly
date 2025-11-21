@@ -190,24 +190,14 @@ function App() {
                 />
               )}
               <div className="track-info">
-                <div className="title">
-                  {media.artist} — {media.title}
-                </div>
+                <div className="title">{media.title}</div>
+                <div className="artist">{media.artist}</div>
                 <div className="album-name">{media.album}</div>
               </div>
             </div>
             {loading || !lyrics ? (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: 130,
-                }}
-              >
+              <div className="loading">
                 <div className="spinner" />
-                <div className="hint">Fetching lyrics…</div>
               </div>
             ) : synced ? (
               <div className="lyrics">
