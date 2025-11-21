@@ -2,23 +2,28 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap");
 
 :root {
-  --bg-1: #f6f8ff;
-  --bg-2: #eef6ff;
-  --card-bg: rgba(255, 255, 255, 0.75);
   --accent: #5966ff;
   --muted: #6b7280;
-  --glass: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.6);
+  --ui-base-width: 2560;
+  --ui-base-height: 1417;
+  /* scale based on the smaller ratio of viewport width/height vs base size */
+  --ui-scale: min(
+    calc(100vw / var(--ui-base-width)),
+    calc(100vh / var(--ui-base-height))
+  );
+  /* clamp to a reasonable range for better UX */
+  --ui-scale-clamped: clamp(0.5, var(--ui-scale), 1.5);
 }
 
-/* subtle radial gradient background */
 body {
-  background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  background: #071126;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  min-height: 97.41666vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 /* container centers the card */
@@ -34,7 +39,8 @@ body {
 
 /* card */
 .card {
-  width: min(920px, 80vw);
+  width: 90vw;
+  height: 47.5vw;
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.8),
@@ -42,18 +48,43 @@ body {
   );
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(20, 24, 40, 0.12);
-  padding: 2rem;
-  display: inline;
-  gap: 1rem;
-  align-items: center;
+  padding-left: 4.5rem;
+  padding-right: 4.5rem;
+  padding-top: 3rem;
+  padding-bottom: 3rem;
   border: 1px solid rgba(100, 110, 255, 0.08);
   backdrop-filter: blur(8px) saturate(120%);
+}
+
+/* responsive adjustments */
+@media (max-width: 600px) {
+  .album-thumbnail {
+    width: 80px;
+    height: 80px;
+  }
+
+  .lyric-line {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .album-section {
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 1rem;
+  }
+
+  .lyric-line {
+    font-size: 0.9rem;
+  }
 }
 
 /* fallback single column on small screens */
 @media (max-width: 720px) {
   .card {
-    grid-template-columns: 1fr;
     padding: 1rem;
   }
 }
@@ -65,7 +96,7 @@ body {
 }
 
 .title {
-  font-size: 1.2rem;
+  font-size: clamp(1.5rem, 2vw, 2.5rem);
   font-weight: 700;
   color: #bac8e0;
   margin-bottom: 0.15rem;
@@ -73,14 +104,14 @@ body {
 
 .album-section {
   display: flex;
-  gap: 16px;
+  gap: 24px;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 32px;
 }
 
 .album-thumbnail {
-  width: 120px;
-  height: 120px;
+  width: clamp(120px, 15vw, 200px);
+  height: clamp(120px, 15vw, 200px);
   border-radius: 8px;
   object-fit: cover;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -91,37 +122,28 @@ body {
 }
 
 .album-name {
-  font-size: 14px;
+  font-size: clamp(1rem, 2vw, 2rem);
   color: #888;
-  margin-top: 8px;
+  margin-bottom: 4px;
 }
 
 /* lyrics area */
 .lyrics {
-  grid-column: 1 / -1;
-  padding: 0.5rem 1.5rem;
   border-radius: 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.6),
-    rgba(250, 250, 252, 0.55)
-  );
-  border: 1px solid rgba(20, 24, 40, 0.03);
-  overflow: hidden;
 }
 
 /* lines */
 .lyric-list {
   display: flex;
-  height: 55vh;
+  height: 67vh;
   flex-direction: column;
-  gap: 6px;
+  gap: 24px;
   align-items: center;
   justify-content: center;
 }
 
 .lyric-line {
-  font-size: 1.4rem;
+  font-size: clamp(1.5rem, 3vw, 4rem);
   transition: all 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
   color: #1f2937;
   opacity: 0.6;
@@ -141,7 +163,7 @@ body {
 
 /* non-synced plain lyrics */
 pre {
-  font-size: 1.2rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
   white-space: pre-wrap;
   text-align: center;
   font-family: inherit;
@@ -159,6 +181,7 @@ pre {
   animation: spin 1s linear infinite;
   margin: 0 auto;
 }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -177,7 +200,6 @@ pre {
   :root {
     --bg-1: #081025;
     --bg-2: #071428;
-    --card-bg: rgba(20, 24, 40, 0.48);
     --accent: #6ad3ff;
     --muted: #9aa4b2;
   }
