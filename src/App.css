@@ -2,17 +2,10 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap");
 
 :root {
-  --accent: #5966ff;
-  --muted: #6b7280;
-  --ui-base-width: 2560;
-  --ui-base-height: 1417;
-  /* scale based on the smaller ratio of viewport width/height vs base size */
-  --ui-scale: min(
-    calc(100vw / var(--ui-base-width)),
-    calc(100vh / var(--ui-base-height))
-  );
-  /* clamp to a reasonable range for better UX */
-  --ui-scale-clamped: clamp(0.5, var(--ui-scale), 1.5);
+  --bg-1: #081025;
+  --bg-2: #071428;
+  --accent: #6ad3ff;
+  --muted: #9aa4b2;
 }
 
 body {
@@ -21,92 +14,56 @@ body {
     "Helvetica Neue", Arial;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
 }
 
-/* container centers the card */
 .container {
-  margin: 0;
-  padding-top: 3vh;
+  padding-top: 4vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
-  gap: 1rem;
 }
 
-/* card */
 .card {
   width: 90vw;
-  height: 47.5vw;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.8),
-    rgba(250, 250, 252, 0.7)
-  );
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(20, 24, 40, 0.12);
+  height: 47vw;
+  border-radius: 32px;
   padding-left: 4.5rem;
   padding-right: 4.5rem;
   padding-top: 3rem;
   padding-bottom: 3rem;
-  border: 1px solid rgba(100, 110, 255, 0.08);
   backdrop-filter: blur(8px) saturate(120%);
+  background: linear-gradient(
+    180deg,
+    rgba(8, 12, 24, 0.6),
+    rgba(6, 10, 20, 0.6)
+  );
+  border: 1px solid rgba(120, 180, 255, 0.06);
 }
 
-/* responsive adjustments */
-@media (max-width: 600px) {
-  .album-thumbnail {
-    width: 80px;
-    height: 80px;
-  }
-
-  .lyric-line {
-    font-size: 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .album-section {
-    gap: 8px;
-  }
-
-  .title {
-    font-size: 1rem;
-  }
-
-  .lyric-line {
-    font-size: 0.9rem;
-  }
-}
-
-/* fallback single column on small screens */
-@media (max-width: 720px) {
-  .card {
-    padding: 1rem;
-  }
-}
-
-/* metadata and title */
 .meta {
   text-align: left;
-  padding: 0.25rem 0;
+  padding-top: 1.5rem;
 }
 
 .title {
   font-size: clamp(1.5rem, 2vw, 2.5rem);
   font-weight: 700;
   color: #bac8e0;
-  margin-bottom: 0.15rem;
+  margin-bottom: 1rem;
+}
+
+.artist {
+  font-size: clamp(1rem, 2vw, 2rem);
+  font-weight: 5000;
+  color: #bac8e0;
+  margin-bottom: 1rem;
 }
 
 .album-section {
   display: flex;
   gap: 24px;
   align-items: flex-start;
-  margin-bottom: 32px;
+  margin-bottom: 64px;
 }
 
 .album-thumbnail {
@@ -114,43 +71,32 @@ body {
   height: clamp(120px, 15vw, 200px);
   border-radius: 8px;
   object-fit: cover;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.track-info {
-  flex: 1;
 }
 
 .album-name {
   font-size: clamp(1rem, 2vw, 2rem);
   color: #888;
-  margin-bottom: 4px;
 }
 
-/* lyrics area */
 .lyrics {
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 32px;
 }
 
-/* lines */
 .lyric-list {
   display: flex;
-  height: 67vh;
+  height: 64vh;
   flex-direction: column;
   gap: 24px;
-  align-items: center;
   justify-content: center;
 }
 
 .lyric-line {
   font-size: clamp(1.5rem, 3vw, 4rem);
   transition: all 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
-  color: #1f2937;
-  opacity: 0.6;
-  transform-origin: center;
-  white-space: normal;
-  word-break: break-word;
   text-align: center;
+  color: #dbeafe;
+  opacity: 0.7;
 }
 
 .lyric-line.active {
@@ -158,23 +104,26 @@ body {
   font-weight: 700;
   transform: scale(1.03);
   color: var(--accent);
-  text-shadow: 0 2px 10px rgba(89, 102, 255, 0.12);
 }
 
-/* non-synced plain lyrics */
 pre {
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  white-space: pre-wrap;
+  font-size: clamp(1.5rem, 3vw, 4rem);
   text-align: center;
   font-family: inherit;
-  margin: 0;
   color: #94aac9;
 }
 
-/* spinner */
+.loading {
+  display: "flex";
+  flex-direction: "column";
+  align-items: "center";
+  gap: 8;
+  padding: 16vw;
+}
+
 .spinner {
-  width: 36px;
-  height: 36px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   border: 4px solid rgba(0, 0, 0, 0.06);
   border-top-color: var(--accent);
@@ -185,41 +134,5 @@ pre {
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-/* small helper text */
-.hint {
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin-top: 0.5rem;
-}
-
-/* dark mode tweaks */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-1: #081025;
-    --bg-2: #071428;
-    --accent: #6ad3ff;
-    --muted: #9aa4b2;
-  }
-  .card {
-    background: linear-gradient(
-      180deg,
-      rgba(8, 12, 24, 0.6),
-      rgba(6, 10, 20, 0.6)
-    );
-    border: 1px solid rgba(120, 180, 255, 0.06);
-  }
-  .lyrics {
-    background: rgba(255, 255, 255, 0.03);
-  }
-  .lyric-line {
-    color: #dbeafe;
-    opacity: 0.7;
-  }
-  .lyric-line.active {
-    color: var(--accent);
-    text-shadow: none;
   }
 }
