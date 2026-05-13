@@ -23,7 +23,7 @@
   --artist-size: clamp(1rem, 2.5vw, 2rem);
   --album-name-size: clamp(0.75rem, 2.5vw, 1.5rem);
 
-  --lyrics-size: clamp(1.5rem, 4vw, 5rem);
+  --lyrics-size: clamp(1.5rem, 4vw, 4rem);
 
   --transition-fast: 180ms ease;
 
@@ -156,6 +156,12 @@ body {
   margin-top: var(--space-xxl);
 
   overflow: hidden;
+
+  inline-size: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  box-sizing: border-box;
+  white-space: normal;
 }
 
 .plain-lyrics,
