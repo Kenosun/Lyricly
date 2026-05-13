@@ -1,15 +1,11 @@
 import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface LyricsResponse {
-  trackName: string;
-  artistName: string;
-  albumName: string;
-  duration: number;
   plainLyrics: string;
-  syncedLyrics: string;
+  syncedLyrics: LyricLine[];
   synced: boolean;
   failed: boolean;
 }
@@ -23,74 +19,65 @@ interface Media {
   thumbnail: string;
 }
 
+interface LyricWord {
+  c: string; // content
+  o: number; // offset from start time (ts)
+}
+
+interface LyricLine {
+  ts: number; // start time
+  te: number; // end time
+  x: string; // full text
+  l: LyricWord[]; // word-level data
+}
+
 function App() {
   // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  const [media, setMedia] = useState<Media | null>(null);
-  const [lyrics, setLyrics] = useState<string>("");
-  const [synced, setSynced] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [currentLines, setCurrentLines] = useState<string[]>([]);
   const [currentPosition, setCurrentPosition] = useState<number>(0);
-  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
-  const [parsedLyrics, setParsedLyrics] = useState<
-    { time: number; text: string }[]
-  >([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [media, setMedia] = useState<Media | null>(null);
+  const [synced, setSynced] = useState<boolean>(false);
+  const [plainLyrics, setPlainLyrics] = useState<string>("");
+  const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
+  const [precisePosition, setPrecisePosition] = useState(0);
+  const activeLineRef = useRef<HTMLDivElement>(null);
 
-  // start listening to the event
+  // initial setup
   useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
+    let unlistenMedia: UnlistenFn;
+    let unlistenPosition: UnlistenFn;
+    async function setupListeners() {
+      // trigger backend loops
+      invoke("fetch_media_loop").catch(console.error);
+      invoke("fetch_position_loop").catch(console.error);
 
-    listen<Media>("update_media", (event) => {
-      setMedia(event.payload);
-    }).then((fn) => {
-      unlisten = fn;
-    });
-
-    // trigger backend
-    invoke("fetch_media_loop").catch(console.error);
-
-    // cleanup function to unsubscribe when component unmounts
+      // listen for the events the loops will emit
+      unlistenMedia = await listen<Media>("update_media", (event) => {
+        setMedia(event.payload);
+      });
+      unlistenPosition = await listen<number>("update_position", (event) => {
+        setCurrentPosition(event.payload);
+      });
+    }
+    setupListeners();
     return () => {
-      if (unlisten) unlisten();
-    };
-  }, []);
-
-  useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
-
-    listen<number>("update_position", (event) => {
-      setCurrentPosition(event.payload);
-    }).then((fn) => {
-      unlisten = fn;
-    });
-
-    // trigger backend
-    invoke("fetch_position_loop").catch(console.error);
-
-    // cleanup function to unsubscribe when component unmounts
-    return () => {
-      if (unlisten) unlisten();
+      if (unlistenMedia) unlistenMedia();
+      if (unlistenPosition) unlistenPosition();
     };
   }, []);
 
   // on media change
   useEffect(() => {
     // reset everything
-    setLyrics("");
-    setSynced(false);
     setLoading(true);
-    setCurrentLines([]);
+    setPlainLyrics("");
+    setSyncedLyrics([]);
     setCurrentPosition(0);
-    setHighlightedIndex(0);
-    setParsedLyrics([]);
-    console.log("reset everything");
+    setSynced(false);
 
     if (!media) return;
-    let cancelled = false;
 
     const handleLyrics = async () => {
-      setLoading(true);
-
       // fetch lyrics
       const result = await invoke<LyricsResponse>("fetch_lyrics", {
         artist: media.artist,
@@ -98,126 +85,129 @@ function App() {
         duration: media.duration,
       });
 
-      // ignore outdated results
-      if (cancelled) return;
-
-      if (result.failed) {
-        setLyrics("No lyrics found.");
-      } else {
-        const fetchedText = result.synced
-          ? result.syncedLyrics
-          : result.plainLyrics;
+      if (!result.failed) {
+        console.log(result);
         setSynced(result.synced);
-        setLyrics(fetchedText);
-        console.log("fetched lyrics");
-
-        // romanize lyrics
-        const romanizeResult = await invoke<string>("romanize_lyrics", {
-          lyrics: fetchedText,
-        });
-        if (cancelled) return;
-        setLyrics(romanizeResult);
-        console.log("romanized lyrics");
-
-        // parse lyrics
-        const parseResult = await invoke<{ time: number; text: string }[]>(
-          "parse_lyrics",
-          { lyrics: romanizeResult },
-        );
-        if (cancelled) return;
-        setParsedLyrics(parseResult);
-        console.log("parsed lyrics");
+        if (result.synced) {
+          // parse the string into an object/array
+          const parsedLyrics =
+            typeof result.syncedLyrics === "string"
+              ? JSON.parse(result.syncedLyrics)
+              : result.syncedLyrics;
+          setSyncedLyrics(parsedLyrics);
+        } else {
+          setPlainLyrics(result.plainLyrics);
+        }
       }
+
       setLoading(false);
     };
     handleLyrics();
-    return () => {
-      cancelled = true;
-    };
   }, [media]);
 
-  // update current lines
+  // sync position
   useEffect(() => {
-    if (!media || parsedLyrics.length === 0) return;
-    let id: number;
+    let frameId: number;
+    const startTime = performance.now();
+    const offset = currentPosition;
 
-    let startTime = performance.now();
-    let offset = currentPosition ?? media.position;
-
-    const update = () => {
+    const sync = () => {
       const elapsed = performance.now() - startTime;
-      const currentTime = offset + elapsed;
-
-      // find the current line index
-      const currentIndex = parsedLyrics.findIndex(
-        (l, i) =>
-          l.time <= currentTime &&
-          (i === parsedLyrics.length - 1 ||
-            parsedLyrics[i + 1].time > currentTime),
-      );
-
-      if (currentIndex === -1) {
-        setCurrentLines(parsedLyrics.slice(0, 5).map((l) => l.text));
-        setHighlightedIndex(-1);
-      } else if (currentIndex < 2) {
-        setHighlightedIndex(currentIndex);
-      } else if (currentIndex >= 2) {
-        const start = Math.max(currentIndex - 2, 0);
-        const end = Math.min(currentIndex + 3, parsedLyrics.length);
-        setCurrentLines(parsedLyrics.slice(start, end).map((l) => l.text));
-        setHighlightedIndex(currentIndex - start);
-      }
-
-      id = requestAnimationFrame(update);
+      setPrecisePosition(offset + elapsed);
+      frameId = requestAnimationFrame(sync);
     };
-    id = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(id);
-  }, [media, parsedLyrics, currentPosition]);
+
+    if (synced) {
+      // only run while the music is actually moving
+      frameId = requestAnimationFrame(sync);
+    }
+
+    return () => cancelAnimationFrame(frameId);
+  }, [currentPosition, synced]);
+
+  // find active line using binary search
+  const activeLineIndex = useMemo(() => {
+    let low = 0;
+    let high = syncedLyrics.length - 1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const start = syncedLyrics[mid].ts * 1000;
+      const nextLine = syncedLyrics[mid + 1];
+      const end = nextLine ? nextLine.ts * 1000 : Infinity;
+
+      if (precisePosition >= start && precisePosition < end) {
+        return mid;
+      } else if (precisePosition < start) {
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    return -1;
+  }, [syncedLyrics, precisePosition]);
+
+  // scroll to active line
+  useEffect(() => {
+    if (activeLineRef.current) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex]);
 
   return (
-    <main className="container">
+    <main>
       {media ? (
-        <div className="card" role="region" aria-label="Now playing">
-          <div className="meta">
-            <div className="album-section">
-              {media.thumbnail && (
-                <img
-                  className="album-thumbnail"
-                  src={`data:image/jpeg;base64,${media.thumbnail}`}
-                  alt="thumbnail"
-                />
-              )}
-              <div className="track-info">
-                <div className="title">{media.title}</div>
-                <div className="artist">{media.artist}</div>
-                <div className="album-name">{media.album}</div>
-              </div>
-            </div>
-            {loading || !lyrics ? (
-              <div className="loading">
-                <div className="spinner" />
-              </div>
-            ) : synced ? (
-              <div className="lyrics">
-                <div className="lyric-list">
-                  {currentLines.map((line, i) => (
-                    <div
-                      key={i}
-                      className={`lyric-line ${
-                        i === highlightedIndex ? "active" : ""
-                      }`}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="lyrics">
-                <pre>{lyrics}</pre>
-              </div>
+        <div>
+          <div className="album-section">
+            {media.thumbnail && (
+              <img
+                className="album-thumbnail"
+                src={`data:image/jpeg;base64,${media.thumbnail}`}
+                alt="thumbnail"
+              />
             )}
+            <div>
+              <div className="title">{media.title}</div>
+              <div className="artist">{media.artist}</div>
+              <div className="album-name">{media.album}</div>
+            </div>
           </div>
+
+          {loading ? (
+            <div className="loading">
+              <div className="spinner" />
+            </div>
+          ) : synced ? (
+            <div className="synced-lyrics">
+              {syncedLyrics.map((line, index) => {
+                const isActive = activeLineIndex === index;
+                return (
+                  <div
+                    key={line.ts}
+                    ref={isActive ? activeLineRef : null}
+                    className={`line ${isActive ? "active" : ""}`}
+                    style={{
+                      opacity: isActive ? 1 : 0.5,
+                      transition: "0.3s",
+                    }}
+                  >
+                    {line.l.map((word, wIdx) => {
+                      // const wordStartTime = line.ts + word.o;
+                      return <span key={wIdx}>{word.c} </span>;
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="plain-lyrics">
+              <pre>{plainLyrics}</pre>
+            </div>
+          )}
         </div>
       ) : (
         <p>Nothing is playing.</p>

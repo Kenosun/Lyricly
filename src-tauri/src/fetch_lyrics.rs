@@ -1,16 +1,12 @@
+use musixmatch_inofficial::{
+    models::{SortOrder, TrackId},
+    MusixmatchBuilder,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LyricsResponse {
-    #[serde(default)]
-    pub track_name: Option<String>,
-    #[serde(default)]
-    pub artist_name: Option<String>,
-    #[serde(default)]
-    pub album_name: Option<String>,
-    #[serde(default)]
-    pub duration: Option<f64>,
     #[serde(default)]
     pub plain_lyrics: Option<String>,
     #[serde(default)]
@@ -27,51 +23,36 @@ pub async fn fetch_lyrics(
     title: String,
     duration: f64,
 ) -> Result<LyricsResponse, ()> {
-    let encoded_artist = urlencoding::encode(&artist);
-    let encoded_title = urlencoding::encode(&title);
-    let duration_in_seconds = duration / 1000.0;
+    // let duration_in_seconds = (duration / 1000.0) as f32;
 
-    let url = format!(
-        "https://lrclib.net/api/search?artist_name={}&track_name={}&duration={}",
-        encoded_artist, encoded_title, duration_in_seconds
-    );
-
-    if let Some(response) = reqwest::get(url).await.ok() {
-        if let Some(response_text) = response.text().await.ok() {
-            if let Ok(lyrics_list) = serde_json::from_str::<Vec<LyricsResponse>>(&response_text) {
-                let mut best_synced: Option<LyricsResponse> = None;
-                let mut best_plain: Option<LyricsResponse> = None;
-                let mut smallest_diff_synced = f64::MAX;
-                let mut smallest_diff_plain = f64::MAX;
-
-                // find best fitting lyrics based on duration
-                for mut lyrics in lyrics_list {
-                    if let Some(lyrics_duration) = lyrics.duration {
-                        let diff = (lyrics_duration - duration_in_seconds).abs();
-
-                        if lyrics.synced_lyrics.is_some() {
-                            if diff < smallest_diff_synced {
-                                smallest_diff_synced = diff;
-                                lyrics.synced = true;
-                                best_synced = Some(lyrics);
-                            }
-                        } else if lyrics.plain_lyrics.is_some() {
-                            if diff < smallest_diff_plain {
-                                smallest_diff_plain = diff;
-                                lyrics.synced = false;
-                                best_plain = Some(lyrics);
-                            }
-                        }
+    if let Ok(client) = MusixmatchBuilder::new().build() {
+        if let Ok(response) = client
+            .track_search()
+            .q_track_artist((artist + " " + &title).as_str())
+            .s_track_rating(SortOrder::Desc)
+            .send(1, 1)
+            .await
+        {
+            if let Some(track) = response.first() {
+                let commontrack_id = TrackId::Commontrack(track.commontrack_id);
+                if track.has_richsync {
+                    if let Ok(lyrics) = client.track_richsync(commontrack_id, None, None).await {
+                        return Ok(LyricsResponse {
+                            synced_lyrics: Some(lyrics.richsync_body),
+                            synced: true,
+                            failed: false,
+                            ..Default::default()
+                        });
                     }
-                }
-
-                // prefer synced lyrics if available
-                if let Some(mut lyrics) = best_synced {
-                    lyrics.failed = false;
-                    return Ok(lyrics);
-                } else if let Some(mut lyrics) = best_plain {
-                    lyrics.failed = false;
-                    return Ok(lyrics);
+                } else {
+                    if let Ok(lyrics) = client.track_lyrics(commontrack_id).await {
+                        return Ok(LyricsResponse {
+                            plain_lyrics: Some(lyrics.lyrics_body),
+                            synced: false,
+                            failed: false,
+                            ..Default::default()
+                        });
+                    }
                 }
             }
         }
