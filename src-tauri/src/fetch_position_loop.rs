@@ -10,10 +10,12 @@ pub async fn fetch_position_loop(app: tauri::AppHandle) {
 
     // initialize media manager
     let manager_result = GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+
     if manager_result.is_err() {
         let _ = app.emit(media_event, "Failed to request media manager");
         return;
     }
+
     let manager = match manager_result.unwrap().await {
         Ok(m) => m,
         Err(_) => {

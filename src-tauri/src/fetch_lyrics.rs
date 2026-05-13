@@ -37,9 +37,14 @@ pub async fn fetch_lyrics(
         {
             if let Some(track) = response.first() {
                 let commontrack_id = TrackId::Commontrack(track.commontrack_id);
+
                 if track.has_richsync {
                     if let Ok(richsynced_lyrics) = client
-                        .track_richsync(commontrack_id, Some(duration_in_seconds), Some(1 as f32))
+                        .track_richsync(
+                            commontrack_id.clone(),
+                            Some(duration_in_seconds),
+                            Some(1 as f32),
+                        )
                         .await
                     {
                         return Ok(LyricsResponse {
@@ -50,10 +55,12 @@ pub async fn fetch_lyrics(
                             ..Default::default()
                         });
                     }
-                } else if track.has_subtitles {
+                }
+
+                if track.has_subtitles {
                     if let Ok(subtitle_lyrics) = client
                         .track_subtitle(
-                            commontrack_id,
+                            commontrack_id.clone(),
                             SubtitleFormat::Json,
                             Some(duration_in_seconds),
                             Some(1 as f32),
@@ -68,7 +75,9 @@ pub async fn fetch_lyrics(
                             ..Default::default()
                         });
                     }
-                } else if track.has_lyrics {
+                }
+
+                if track.has_lyrics {
                     if let Ok(plain_lyrics) = client.track_lyrics(commontrack_id).await {
                         return Ok(LyricsResponse {
                             plain_lyrics: Some(plain_lyrics.lyrics_body),
