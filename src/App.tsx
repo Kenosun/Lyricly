@@ -82,6 +82,7 @@ function App() {
   const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
   const [precisePosition, setPrecisePosition] = useState(0);
   const activeLineRef = useRef<HTMLDivElement>(null);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   // initial setup
   useEffect(() => {
@@ -116,6 +117,10 @@ function App() {
     setCurrentPosition(0);
     setSynced(false);
     setLyricsNotFound(false);
+
+    if (lyricsContainerRef.current) {
+      lyricsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
 
     if (!media) return;
 
@@ -199,7 +204,7 @@ function App() {
 
   // scroll to active line
   useEffect(() => {
-    if (activeLineRef.current) {
+    if (activeLineRef.current && activeLineIndex !== -1) {
       activeLineRef.current.scrollIntoView({
         behavior: "smooth",
         block: "center",
@@ -226,71 +231,77 @@ function App() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="loading">
-              <div className="spinner" />
-            </div>
-          ) : lyricsNotFound ? (
-            <div className="no-lyrics">
-              <p>No lyrics found.</p>
-            </div>
-          ) : synced ? (
-            <div className="synced-lyrics">
-              {syncedLyrics.map((line, index) => {
-                const isActive = activeLineIndex === index;
-                return (
-                  <div
-                    key={line.ts}
-                    ref={isActive ? activeLineRef : null}
-                    className={`line ${isActive ? "active" : ""}`}
-                  >
-                    {line.l.map((word, wIdx) => {
-                      // word time in ms
-                      const wordStart = (line.ts + word.o) * 1000;
-                      const nextWord = line.l[wIdx + 1];
+          <div
+            ref={lyricsContainerRef}
+            className="lyrics-wrapper"
+            key={media?.title + media?.artist}
+          >
+            {loading ? (
+              <div className="loading">
+                <div className="spinner" />
+              </div>
+            ) : lyricsNotFound ? (
+              <div className="no-lyrics">
+                <p>No lyrics found.</p>
+              </div>
+            ) : synced ? (
+              <div className="synced-lyrics">
+                {syncedLyrics.map((line, index) => {
+                  const isActive = activeLineIndex === index;
+                  return (
+                    <div
+                      key={line.ts}
+                      ref={isActive ? activeLineRef : null}
+                      className={`line ${isActive ? "active" : ""}`}
+                    >
+                      {line.l.map((word, wIdx) => {
+                        // word time in ms
+                        const wordStart = (line.ts + word.o) * 1000;
+                        const nextWord = line.l[wIdx + 1];
 
-                      const wordEnd = nextWord
-                        ? (line.ts + nextWord.o) * 1000
-                        : line.te * 1000;
+                        const wordEnd = nextWord
+                          ? (line.ts + nextWord.o) * 1000
+                          : line.te * 1000;
 
-                      const isWordActive =
-                        precisePosition >= wordStart &&
-                        precisePosition < wordEnd;
+                        const isWordActive =
+                          precisePosition >= wordStart &&
+                          precisePosition < wordEnd;
 
-                      // progress through current word (0 → 1)
-                      const progress = isWordActive
-                        ? Math.min(
-                            1,
-                            (precisePosition - wordStart) /
-                              (wordEnd - wordStart),
-                          )
-                        : precisePosition > wordEnd
-                          ? 1
-                          : 0;
+                        // progress through current word (0 → 1)
+                        const progress = isWordActive
+                          ? Math.min(
+                              1,
+                              (precisePosition - wordStart) /
+                                (wordEnd - wordStart),
+                            )
+                          : precisePosition > wordEnd
+                            ? 1
+                            : 0;
 
-                      return (
-                        <span
-                          key={wIdx}
-                          className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
-                          style={
-                            {
-                              "--progress": progress,
-                            } as React.CSSProperties
-                          }
-                        >
-                          {word.c}&nbsp;
-                        </span>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="plain-lyrics">
-              <pre>{plainLyrics}</pre>
-            </div>
-          )}
+                        return (
+                          <span
+                            key={wIdx}
+                            className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
+                            style={
+                              {
+                                "--progress": progress,
+                              } as React.CSSProperties
+                            }
+                          >
+                            {word.c}&nbsp;
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="plain-lyrics">
+                <pre>{plainLyrics}</pre>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <p>Nothing is playing.</p>
