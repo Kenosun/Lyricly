@@ -76,6 +76,7 @@ function App() {
   const [currentPosition, setCurrentPosition] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [media, setMedia] = useState<Media | null>(null);
+  const [lyricsNotFound, setLyricsNotFound] = useState(false);
   const [synced, setSynced] = useState<boolean>(false);
   const [plainLyrics, setPlainLyrics] = useState<string>("");
   const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
@@ -114,6 +115,7 @@ function App() {
     setSyncedLyrics([]);
     setCurrentPosition(0);
     setSynced(false);
+    setLyricsNotFound(false);
 
     if (!media) return;
 
@@ -125,17 +127,22 @@ function App() {
         duration: media.duration,
       });
 
-      if (!result.failed) {
+      if (result.failed) {
+        setLyricsNotFound(true);
+      } else {
         setSynced(result.synced);
+
         if (result.synced) {
           // parse the string into an object/array
           let parsedLyrics =
             typeof result.syncedLyrics === "string"
               ? JSON.parse(result.syncedLyrics)
               : result.syncedLyrics;
+
           if (!result.richsynced) {
             parsedLyrics = convertLyrics(parsedLyrics);
           }
+
           setSyncedLyrics(parsedLyrics);
         } else {
           setPlainLyrics(result.plainLyrics);
@@ -223,6 +230,10 @@ function App() {
             <div className="loading">
               <div className="spinner" />
             </div>
+          ) : lyricsNotFound ? (
+            <div className="no-lyrics">
+              <p>No lyrics found.</p>
+            </div>
           ) : synced ? (
             <div className="synced-lyrics">
               {syncedLyrics.map((line, index) => {
@@ -277,7 +288,7 @@ function App() {
             </div>
           ) : (
             <div className="plain-lyrics">
-              <span>{plainLyrics}</span>
+              <pre>{plainLyrics}</pre>
             </div>
           )}
         </div>

@@ -23,6 +23,8 @@
   --lyrics-size: 2rem;
 
   --transition-fast: 180ms ease;
+
+  --plain-lyrics-height: 20rem;
 }
 
 @media (max-width: 768px) {
@@ -162,6 +164,7 @@ body {
 .plain-lyrics {
   color: var(--text-secondary);
   overflow-y: auto;
+  max-height: var(--plain-lyrics-height);
 }
 
 .line {
@@ -202,4 +205,10 @@ body {
   color: var(--accent);
 
   transition: background 0.08s linear;
+}
+
+.no-lyrics {
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: var(--lyrics-size);
 }
