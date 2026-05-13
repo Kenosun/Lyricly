@@ -149,9 +149,7 @@ body {
 
   line-height: var(--line-height-multiplier);
 
-  max-height: calc(
-    (var(--actual-line-height) * var(--visible-lines)) - 0.25rem
-  );
+  max-height: calc((var(--actual-line-height) * var(--visible-lines)));
 
   margin-top: var(--space-xxl);
 
@@ -203,7 +201,7 @@ body {
   opacity: 1;
   font-weight: 700;
 
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .karaoke-word {
