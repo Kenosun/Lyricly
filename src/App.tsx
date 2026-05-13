@@ -190,14 +190,44 @@ function App() {
                     key={line.ts}
                     ref={isActive ? activeLineRef : null}
                     className={`line ${isActive ? "active" : ""}`}
-                    style={{
-                      opacity: isActive ? 1 : 0.5,
-                      transition: "0.3s",
-                    }}
                   >
                     {line.l.map((word, wIdx) => {
-                      // const wordStartTime = line.ts + word.o;
-                      return <span key={wIdx}>{word.c} </span>;
+                      // word time in ms
+                      const wordStart = (line.ts + word.o) * 1000;
+                      const nextWord = line.l[wIdx + 1];
+
+                      const wordEnd = nextWord
+                        ? (line.ts + nextWord.o) * 1000
+                        : line.te * 1000;
+
+                      const isWordActive =
+                        precisePosition >= wordStart &&
+                        precisePosition < wordEnd;
+
+                      // progress through current word (0 → 1)
+                      const progress = isWordActive
+                        ? Math.min(
+                            1,
+                            (precisePosition - wordStart) /
+                              (wordEnd - wordStart),
+                          )
+                        : precisePosition > wordEnd
+                          ? 1
+                          : 0;
+
+                      return (
+                        <span
+                          key={wIdx}
+                          className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
+                          style={
+                            {
+                              "--progress": progress,
+                            } as React.CSSProperties
+                          }
+                        >
+                          {word.c}&nbsp;
+                        </span>
+                      );
                     })}
                   </div>
                 );

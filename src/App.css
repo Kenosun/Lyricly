@@ -5,6 +5,7 @@
   --text-primary: #dbeafe;
   --text-secondary: #94aac9;
   --text-muted: #7b879c;
+  --inactive: #ffffff59;
   --accent: #6ad3ff;
 
   --radius: 10px;
@@ -180,6 +181,25 @@ body {
   opacity: 1;
   font-weight: 700;
 
-  transform: scale(1.02);
+  transform: scale(1.1);
+}
+
+.karaoke-word {
+  display: inline-block;
+}
+
+.line.active .karaoke-word {
+  background: linear-gradient(
+    to right,
+    currentColor calc(var(--progress) * 100%),
+    var(--inactive) calc(var(--progress) * 100%)
+  );
+
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+
   color: var(--accent);
+
+  transition: background 0.08s linear;
 }
