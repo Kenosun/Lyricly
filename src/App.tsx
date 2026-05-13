@@ -122,9 +122,7 @@ function App() {
         // parse lyrics
         const parseResult = await invoke<{ time: number; text: string }[]>(
           "parse_lyrics",
-          {
-            lyrics: romanizeResult,
-          }
+          { lyrics: romanizeResult },
         );
         if (cancelled) return;
         setParsedLyrics(parseResult);
@@ -155,7 +153,7 @@ function App() {
         (l, i) =>
           l.time <= currentTime &&
           (i === parsedLyrics.length - 1 ||
-            parsedLyrics[i + 1].time > currentTime)
+            parsedLyrics[i + 1].time > currentTime),
       );
 
       if (currentIndex === -1) {

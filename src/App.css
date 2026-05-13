@@ -110,6 +110,7 @@ pre {
   text-align: center;
   font-family: inherit;
   color: #94aac9;
+  overflow-y: auto;
 }
 
 .loading {
