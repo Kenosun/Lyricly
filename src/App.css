@@ -15,6 +15,7 @@
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2rem;
+  --space-xxl: 4rem;
 
   --album-size: 160px;
 
@@ -66,6 +67,8 @@ body {
 
   padding-top: var(--space-lg);
   margin-bottom: var(--space-xl);
+  margin-left: var(--space-lg);
+  margin-top: var(--space-lg);
 }
 
 @media (max-width: 640px) {
@@ -145,10 +148,19 @@ body {
 /* Lyrics */
 
 .synced-lyrics {
-  --line-height: 3rem;
+  --visible-lines: 5;
+  --line-height-multiplier: 1.4;
+  --actual-line-height: calc(
+    var(--lyrics-size) * var(--line-height-multiplier)
+  );
 
-  line-height: var(--line-height);
-  max-height: calc(var(--line-height) * 5);
+  line-height: var(--line-height-multiplier);
+
+  max-height: calc(
+    (var(--actual-line-height) * var(--visible-lines)) - 0.25rem
+  );
+
+  margin-top: var(--space-xxl);
 
   overflow: hidden;
 }
@@ -156,9 +168,17 @@ body {
 .plain-lyrics,
 .line {
   font-size: var(--lyrics-size);
-  line-height: 1.4;
+  line-height: inherit;
 
   text-align: center;
+
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    color var(--transition-fast),
+    font-weight var(--transition-fast);
+
+  will-change: transform, opacity;
 }
 
 .plain-lyrics {
