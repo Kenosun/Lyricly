@@ -17,25 +17,17 @@
   --space-xl: 2rem;
   --space-xxl: 4rem;
 
-  --album-size: 160px;
+  --album-size: clamp(160px, 20vw, 400px);
 
-  --title-size: 2rem;
-  --artist-size: 1.25rem;
-  --lyrics-size: 2rem;
+  --title-size: clamp(2rem, 4vw, 4rem);
+  --artist-size: clamp(1rem, 2.5vw, 2rem);
+  --album-name-size: clamp(0.75rem, 2.5vw, 1.5rem);
+
+  --lyrics-size: clamp(1.5rem, 4vw, 5rem);
 
   --transition-fast: 180ms ease;
 
   --plain-lyrics-height: 20rem;
-}
-
-@media (max-width: 768px) {
-  :root {
-    --album-size: 120px;
-
-    --title-size: 1.6rem;
-    --artist-size: 1rem;
-    --lyrics-size: 1.5rem;
-  }
 }
 
 body {
@@ -81,7 +73,8 @@ body {
 
 .album-thumbnail {
   width: var(--album-size);
-  height: var(--album-size);
+  height: auto;
+  aspect-ratio: 1 / 1;
 
   border-radius: var(--radius);
   object-fit: cover;
@@ -111,7 +104,7 @@ body {
 }
 
 .album-name {
-  font-size: 1rem;
+  font-size: var(--album-name-size);
   color: var(--text-muted);
 }
 
