@@ -23,7 +23,7 @@ pub async fn fetch_lyrics(
     title: String,
     duration: f64,
 ) -> Result<LyricsResponse, ()> {
-    // let duration_in_seconds = (duration / 1000.0) as f32;
+    let duration_in_seconds = (duration / 1000.0) as f32;
 
     if let Ok(client) = MusixmatchBuilder::new().build() {
         if let Ok(response) = client
@@ -36,7 +36,10 @@ pub async fn fetch_lyrics(
             if let Some(track) = response.first() {
                 let commontrack_id = TrackId::Commontrack(track.commontrack_id);
                 if track.has_richsync {
-                    if let Ok(lyrics) = client.track_richsync(commontrack_id, None, None).await {
+                    if let Ok(lyrics) = client
+                        .track_richsync(commontrack_id, Some(duration_in_seconds), Some(1 as f32))
+                        .await
+                    {
                         return Ok(LyricsResponse {
                             synced_lyrics: Some(lyrics.richsync_body),
                             synced: true,
