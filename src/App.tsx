@@ -7,6 +7,7 @@ interface LyricsResponse {
   plainLyrics: string;
   syncedLyrics: LyricLine[];
   synced: boolean;
+  richsynced: boolean;
   failed: boolean;
 }
 
@@ -29,6 +30,45 @@ interface LyricLine {
   te: number; // end time
   x: string; // full text
   l: LyricWord[]; // word-level data
+}
+
+interface SubtitleLine {
+  text: string;
+  time: {
+    total: number;
+  };
+}
+
+// convert subtitle lyrics to richsynced lyrics
+function convertLyrics(subtitle: SubtitleLine[]): LyricLine[] {
+  return subtitle.map((line, index) => {
+    const ts = line.time.total;
+
+    // next line timestamp = this line end
+    const next = subtitle[index + 1];
+    const te = next ? next.time.total : ts + 4;
+
+    // split Japanese safely
+    const words = line.text.trim().split(/(\s+)/).filter(Boolean);
+
+    // if no spaces (Japanese lyrics usually), fallback to character timing
+    const units = words.length <= 1 ? [...line.text] : words;
+
+    const duration = te - ts;
+    const step = duration / Math.max(units.length, 1);
+
+    const l: LyricWord[] = units.map((u, i) => ({
+      c: u,
+      o: i * step,
+    }));
+
+    return {
+      ts,
+      te,
+      x: line.text,
+      l,
+    };
+  });
 }
 
 function App() {
@@ -86,14 +126,16 @@ function App() {
       });
 
       if (!result.failed) {
-        console.log(result);
         setSynced(result.synced);
         if (result.synced) {
           // parse the string into an object/array
-          const parsedLyrics =
+          let parsedLyrics =
             typeof result.syncedLyrics === "string"
               ? JSON.parse(result.syncedLyrics)
               : result.syncedLyrics;
+          if (!result.richsynced) {
+            parsedLyrics = convertLyrics(parsedLyrics);
+          }
           setSyncedLyrics(parsedLyrics);
         } else {
           setPlainLyrics(result.plainLyrics);
@@ -235,7 +277,7 @@ function App() {
             </div>
           ) : (
             <div className="plain-lyrics">
-              <pre>{plainLyrics}</pre>
+              <span>{plainLyrics}</span>
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 use musixmatch_inofficial::{
-    models::{SortOrder, TrackId},
+    models::{SortOrder, SubtitleFormat, TrackId},
     MusixmatchBuilder,
 };
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,8 @@ pub struct LyricsResponse {
     pub synced_lyrics: Option<String>,
     #[serde(default)]
     pub synced: bool,
+    #[serde(default)]
+    pub richsynced: bool,
     #[serde(default)]
     pub failed: bool,
 }
@@ -36,22 +38,42 @@ pub async fn fetch_lyrics(
             if let Some(track) = response.first() {
                 let commontrack_id = TrackId::Commontrack(track.commontrack_id);
                 if track.has_richsync {
-                    if let Ok(lyrics) = client
+                    if let Ok(richsynced_lyrics) = client
                         .track_richsync(commontrack_id, Some(duration_in_seconds), Some(1 as f32))
                         .await
                     {
                         return Ok(LyricsResponse {
-                            synced_lyrics: Some(lyrics.richsync_body),
+                            synced_lyrics: Some(richsynced_lyrics.richsync_body),
                             synced: true,
+                            richsynced: true,
                             failed: false,
                             ..Default::default()
                         });
                     }
-                } else {
-                    if let Ok(lyrics) = client.track_lyrics(commontrack_id).await {
+                } else if track.has_subtitles {
+                    if let Ok(subtitle_lyrics) = client
+                        .track_subtitle(
+                            commontrack_id,
+                            SubtitleFormat::Json,
+                            Some(duration_in_seconds),
+                            Some(1 as f32),
+                        )
+                        .await
+                    {
                         return Ok(LyricsResponse {
-                            plain_lyrics: Some(lyrics.lyrics_body),
+                            synced_lyrics: Some(subtitle_lyrics.subtitle_body),
+                            synced: true,
+                            richsynced: false,
+                            failed: false,
+                            ..Default::default()
+                        });
+                    }
+                } else if track.has_lyrics {
+                    if let Ok(plain_lyrics) = client.track_lyrics(commontrack_id).await {
+                        return Ok(LyricsResponse {
+                            plain_lyrics: Some(plain_lyrics.lyrics_body),
                             synced: false,
+                            richsynced: false,
                             failed: false,
                             ..Default::default()
                         });
