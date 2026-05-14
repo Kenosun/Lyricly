@@ -238,3 +238,25 @@ body {
 .richsynced {
   font-size: var(--richsynced-size);
 }
+
+.fullscreen-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+  border: none;
+
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}

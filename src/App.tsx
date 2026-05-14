@@ -1,8 +1,10 @@
 import "./App.css";
+import { getColor } from "colorthief";
+import { Maximize, Minimize } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getColor } from "colorthief";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface LyricsResponse {
   plainLyrics: string;
@@ -86,6 +88,8 @@ function App() {
   const activeLineRef = useRef<HTMLDivElement>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef(null);
+  const window = useMemo(() => getCurrentWindow(), []);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // initial setup
   useEffect(() => {
@@ -216,10 +220,18 @@ function App() {
     }
   }, [activeLineIndex]);
 
+  const toggleFullscreen = async () => {
+    const alreadyFullscreen = await window.isFullscreen();
+    await window.setFullscreen(!alreadyFullscreen);
+  };
+
   return (
     <main>
       {media ? (
         <div>
+          <button className="fullscreen-btn" onClick={toggleFullscreen}>
+            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+          </button>
           <div className="album-section">
             {media.thumbnail && (
               <img
