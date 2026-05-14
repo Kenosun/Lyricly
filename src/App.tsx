@@ -223,6 +223,7 @@ function App() {
   const toggleFullscreen = async () => {
     const alreadyFullscreen = await window.isFullscreen();
     await window.setFullscreen(!alreadyFullscreen);
+    setIsFullscreen(!alreadyFullscreen);
   };
 
   return (
