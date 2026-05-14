@@ -142,6 +142,9 @@ function App() {
 
       if (result.failed) {
         setLyricsNotFound(true);
+
+        // clear discord RPC
+        invoke("clear_discord_rpc").catch(console.error);
       } else {
         setSynced(result.synced);
 
@@ -160,6 +163,12 @@ function App() {
         } else {
           setPlainLyrics(result.plainLyrics);
         }
+
+        // update discord RPC
+        invoke("set_discord_rpc", {
+          details: media.title,
+          stateMsg: media.artist,
+        }).catch(console.error);
       }
 
       setLoading(false);
