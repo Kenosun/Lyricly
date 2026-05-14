@@ -32,8 +32,6 @@ pub struct LyricsResponse {
     pub synced: bool,
     #[serde(default)]
     pub richsynced: bool,
-    #[serde(default)]
-    pub failed: bool,
 }
 
 #[tauri::command(async)]
@@ -41,7 +39,7 @@ pub async fn fetch_lyrics(
     artist: String,
     title: String,
     duration: f64,
-) -> Result<LyricsResponse, ()> {
+) -> Result<Option<LyricsResponse>, ()> {
     let duration_secs = (duration / 1000.0) as f32;
     let client = MusixmatchBuilder::new().build().map_err(|_| ())?;
     let search_query = format!("{} {}", artist, title);
@@ -87,7 +85,7 @@ pub async fn fetch_lyrics(
             lyrics_res.synced_lyrics = Some(rs.richsync_body);
             lyrics_res.synced = true;
             lyrics_res.richsynced = true;
-            return Ok(lyrics_res);
+            return Ok(Some(lyrics_res));
         }
     }
 
@@ -103,19 +101,16 @@ pub async fn fetch_lyrics(
         {
             lyrics_res.synced_lyrics = Some(sub.subtitle_body);
             lyrics_res.synced = true;
-            return Ok(lyrics_res);
+            return Ok(Some(lyrics_res));
         }
     }
 
     if track.has_lyrics {
         if let Ok(lyrics) = client.track_lyrics(commontrack_id).await {
             lyrics_res.plain_lyrics = Some(lyrics.lyrics_body);
-            return Ok(lyrics_res);
+            return Ok(Some(lyrics_res));
         }
     }
 
-    Ok(LyricsResponse {
-        failed: true,
-        ..Default::default()
-    })
+    Ok(None)
 }

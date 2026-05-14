@@ -1,106 +1,32 @@
 import "./App.css";
-import { getColor } from "colorthief";
-import { Maximize, Minimize } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-
-export interface LyricsResponse {
-  // Metadata
-  title: string;
-  artist: string;
-  albumName: string;
-  albumCoverLink?: string;
-  musixmatchLink?: string;
-  spotifyLink?: string;
-
-  // Lyrics
-  plainLyrics?: string;
-  syncedLyrics?: LyricLine[] | string;
-
-  // Status
-  synced: boolean;
-  richsynced: boolean;
-  failed: boolean;
-}
-
-interface Media {
-  artist: string;
-  title: string;
-  duration: number;
-  position: number;
-  album: string;
-  thumbnail: string;
-}
-
-interface LyricWord {
-  c: string; // content
-  o: number; // offset from start time (ts)
-}
-
-interface LyricLine {
-  ts: number; // start time
-  te: number; // end time
-  x: string; // full text
-  l: LyricWord[]; // word-level data
-}
-
-interface SubtitleLine {
-  text: string;
-  time: {
-    total: number;
-  };
-}
-
-// convert subtitle lyrics to richsynced lyrics
-function convertLyrics(subtitle: SubtitleLine[]): LyricLine[] {
-  return subtitle.map((line, index) => {
-    const ts = line.time.total;
-
-    // next line timestamp = this line end
-    const next = subtitle[index + 1];
-    const te = next ? next.time.total : ts + 4;
-
-    // split Japanese safely
-    const words = line.text.trim().split(/(\s+)/).filter(Boolean);
-
-    // if no spaces (Japanese lyrics usually), fallback to character timing
-    const units = words.length <= 1 ? [...line.text] : words;
-
-    const duration = te - ts;
-    const step = duration / Math.max(units.length, 1);
-
-    const l: LyricWord[] = units.map((u, i) => ({
-      c: u,
-      o: i * step,
-    }));
-
-    return {
-      ts,
-      te,
-      x: line.text,
-      l,
-    };
-  });
-}
+import { LyricLine } from "./types/LyricLine";
+import { LyricsResponse } from "./types/LyricsResponse";
+import { Media } from "./types/Media";
+import { convertSubtitleLyrics } from "./utils/convertSubtitleLyrics";
+import { updateDiscordRPC } from "./utils/updateDiscordRPC";
+import { getColor } from "colorthief";
+import { Maximize, Minimize } from "lucide-react";
 
 function App() {
   // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  const [currentPosition, setCurrentPosition] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [media, setMedia] = useState<Media | null>(null);
-  const [lyricsNotFound, setLyricsNotFound] = useState(false);
-  const [synced, setSynced] = useState<boolean>(false);
-  const [richsynced, setRichsynced] = useState<boolean>(false);
-  const [plainLyrics, setPlainLyrics] = useState<string>("");
-  const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
-  const [precisePosition, setPrecisePosition] = useState(0);
-  const activeLineRef = useRef<HTMLDivElement>(null);
-  const lyricsContainerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef(null);
   const window = useMemo(() => getCurrentWindow(), []);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const [media, setMedia] = useState<Media | null>(null);
+  const [lyricsResult, setLyricsResult] = useState<LyricsResponse | null>(null);
+  const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
+
+  const [loading, setLoading] = useState<boolean>(false);
+  const [currentPosition, setCurrentPosition] = useState<number>(0);
+  const [precisePosition, setPrecisePosition] = useState(0);
+
+  const imgRef = useRef(null);
+  const activeLineRef = useRef<HTMLDivElement>(null);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   // initial setup
   useEffect(() => {
@@ -130,80 +56,54 @@ function App() {
   useEffect(() => {
     // reset everything
     setLoading(true);
-    setPlainLyrics("");
+    setLyricsResult(null);
     setSyncedLyrics([]);
-    setCurrentPosition(0);
-    setSynced(false);
-    setRichsynced(false);
-    setLyricsNotFound(false);
+
+    if (!media) {
+      setCurrentPosition(0);
+      return;
+    }
+
+    setCurrentPosition(media.position);
 
     if (lyricsContainerRef.current) {
       lyricsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    if (!media) return;
-
-    const handleLyrics = async () => {
-      // fetch lyrics
+    const fetchLyrics = async () => {
       const result = await invoke<LyricsResponse>("fetch_lyrics", {
         artist: media.artist,
         title: media.title,
         duration: media.duration,
       });
 
-      if (result.failed) {
-        setLyricsNotFound(true);
+      setLyricsResult(result);
 
-        // clear discord RPC
-        invoke("clear_discord_rpc").catch(console.error);
-      } else {
-        setSynced(result.synced);
+      if (result.synced) {
+        // parse the string into an object/array
+        let parsedLyrics =
+          typeof result.syncedLyrics === "string"
+            ? JSON.parse(result.syncedLyrics)
+            : result.syncedLyrics;
 
-        if (result.synced) {
-          // parse the string into an object/array
-          let parsedLyrics =
-            typeof result.syncedLyrics === "string"
-              ? JSON.parse(result.syncedLyrics)
-              : result.syncedLyrics;
-
-          if (!result.richsynced) {
-            parsedLyrics = convertLyrics(parsedLyrics);
-          }
-          setRichsynced(result.richsynced);
-          setSyncedLyrics(parsedLyrics);
-        } else {
-          if (result.plainLyrics) {
-            setPlainLyrics(result.plainLyrics);
-          }
+        if (!result.richsynced) {
+          parsedLyrics = convertSubtitleLyrics(parsedLyrics);
         }
 
-        // update discord RPC
-        const nowInSeconds = Math.floor(Date.now() / 1000);
-        const positionInSeconds = currentPosition / 1000;
-        const durationInSeconds = media.duration / 1000;
-
-        const songStartTime = Math.floor(nowInSeconds - positionInSeconds);
-        const songEndTime = Math.floor(songStartTime + durationInSeconds);
-
-        invoke("set_discord_rpc", {
-          details: result.title,
-          stateMsg: result.artist,
-          startTime: songStartTime,
-          endTime: songEndTime,
-          albumName: result.albumName,
-          albumCoverLink: result.albumCoverLink,
-          musixmatchLink: result.musixmatchLink,
-          spotifyLink: result.spotifyLink,
-        }).catch(console.error);
+        setSyncedLyrics(parsedLyrics);
       }
 
       setLoading(false);
     };
-    handleLyrics();
+    fetchLyrics();
   }, [media]);
 
   // sync position
   useEffect(() => {
+    if (!lyricsResult || currentPosition === -1) {
+      return;
+    }
+
     let frameId: number;
     const startTime = performance.now();
     const offset = currentPosition;
@@ -214,13 +114,13 @@ function App() {
       frameId = requestAnimationFrame(sync);
     };
 
-    if (synced) {
+    if (lyricsResult.synced) {
       // only run while the music is actually moving
       frameId = requestAnimationFrame(sync);
     }
 
     return () => cancelAnimationFrame(frameId);
-  }, [currentPosition, synced]);
+  }, [currentPosition, lyricsResult]);
 
   // find active line using binary search
   const activeLineIndex = useMemo(() => {
@@ -255,140 +155,147 @@ function App() {
     }
   }, [activeLineIndex]);
 
+  // update discord rpc
+  useEffect(() => {
+    if (currentPosition === -1 || !media || !lyricsResult) {
+      invoke("clear_discord_rpc").catch(console.error);
+      return;
+    }
+    updateDiscordRPC(lyricsResult, media, currentPosition);
+  }, [currentPosition, media?.title, lyricsResult]);
+
   const toggleFullscreen = async () => {
-    const alreadyFullscreen = await window.isFullscreen();
-    await window.setFullscreen(!alreadyFullscreen);
-    setIsFullscreen(!alreadyFullscreen);
+    const state = await window.isFullscreen();
+    await window.setFullscreen(!state);
+    setIsFullscreen(!state);
   };
+
+  const handleImageLoad = async (e: React.SyntheticEvent<HTMLImageElement>) => {
+    try {
+      const result = await getColor(e.currentTarget);
+      if (!result) return;
+      const { h, s } = result.hsl();
+      document.documentElement.style.setProperty(
+        "--bg",
+        `hsl(${h}, ${s}%, 20%)`,
+      );
+      document.documentElement.style.setProperty(
+        "--text-primary",
+        `hsl(${h}, ${s}%, 90%)`,
+      );
+      document.documentElement.style.setProperty(
+        "--text-secondary",
+        `hsl(${h}, ${s}%, 70%)`,
+      );
+      document.documentElement.style.setProperty(
+        "--text-muted",
+        `hsl(${h}, ${s}%, 50%)`,
+      );
+      document.documentElement.style.setProperty(
+        "--accent",
+        `hsl(${h}, ${s}%, 90%)`,
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (!media) return <main className="empty-state">Nothing is playing.</main>;
 
   return (
     <main>
-      {media ? (
+      <button className="fullscreen-btn" onClick={toggleFullscreen}>
+        {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+      </button>
+
+      <section className="album-section">
+        {media.thumbnail && (
+          <img
+            ref={imgRef}
+            className="album-thumbnail"
+            src={`data:image/jpeg;base64,${media.thumbnail}`}
+            alt="thumbnail"
+            onLoad={handleImageLoad}
+          />
+        )}
         <div>
-          <button className="fullscreen-btn" onClick={toggleFullscreen}>
-            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-          </button>
-          <div className="album-section">
-            {media.thumbnail && (
-              <img
-                ref={imgRef}
-                className="album-thumbnail"
-                src={`data:image/jpeg;base64,${media.thumbnail}`}
-                alt="thumbnail"
-                onLoad={async (e) => {
-                  try {
-                    const result = await getColor(e.currentTarget);
-                    if (!result) return;
-                    const { h, s } = result.hsl();
-                    document.documentElement.style.setProperty(
-                      "--bg",
-                      `hsl(${h}, ${s}%, 20%)`,
-                    );
-                    document.documentElement.style.setProperty(
-                      "--text-primary",
-                      `hsl(${h}, ${s}%, 90%)`,
-                    );
-                    document.documentElement.style.setProperty(
-                      "--text-secondary",
-                      `hsl(${h}, ${s}%, 70%)`,
-                    );
-                    document.documentElement.style.setProperty(
-                      "--text-muted",
-                      `hsl(${h}, ${s}%, 50%)`,
-                    );
-                    document.documentElement.style.setProperty(
-                      "--accent",
-                      `hsl(${h}, ${s}%, 90%)`,
-                    );
-                  } catch (err) {
-                    console.error(err);
-                  }
-                }}
-              />
-            )}
-            <div>
-              <div className="title">{media.title}</div>
-              <div className="artist">{media.artist}</div>
-              <div className="album-name">{media.album}</div>
-              {richsynced && <p className="richsynced">Richsynced</p>}
-            </div>
-          </div>
-
-          <div
-            ref={lyricsContainerRef}
-            className="lyrics-wrapper"
-            key={media?.title + media?.artist}
-          >
-            {loading ? (
-              <div className="loading">
-                <div className="spinner" />
-              </div>
-            ) : lyricsNotFound ? (
-              <div className="no-lyrics">
-                <p>No lyrics found.</p>
-              </div>
-            ) : synced ? (
-              <div className="synced-lyrics">
-                {syncedLyrics.map((line, index) => {
-                  const isActive = activeLineIndex === index;
-                  return (
-                    <div
-                      key={line.ts}
-                      ref={isActive ? activeLineRef : null}
-                      className={`line ${isActive ? "active" : ""}`}
-                    >
-                      {line.l.map((word, wIdx) => {
-                        // word time in ms
-                        const wordStart = (line.ts + word.o) * 1000;
-                        const nextWord = line.l[wIdx + 1];
-
-                        const wordEnd = nextWord
-                          ? (line.ts + nextWord.o) * 1000
-                          : line.te * 1000;
-
-                        const isWordActive =
-                          precisePosition >= wordStart &&
-                          precisePosition < wordEnd;
-
-                        // progress through current word (0 → 1)
-                        const progress = isWordActive
-                          ? Math.min(
-                              1,
-                              (precisePosition - wordStart) /
-                                (wordEnd - wordStart),
-                            )
-                          : precisePosition > wordEnd
-                            ? 1
-                            : 0;
-
-                        return (
-                          <span
-                            key={wIdx}
-                            className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
-                            style={
-                              {
-                                "--progress": progress,
-                              } as React.CSSProperties
-                            }
-                          >
-                            {word.c}&nbsp;
-                          </span>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="plain-lyrics">
-                <pre>{plainLyrics}</pre>
-              </div>
-            )}
-          </div>
+          <div className="title">{media.title}</div>
+          <div className="artist">{media.artist}</div>
+          <div className="album-name">{media.album}</div>
+          {lyricsResult?.richsynced && <p className="richsynced">Richsynced</p>}
         </div>
-      ) : (
-        <p>Nothing is playing.</p>
-      )}
+      </section>
+
+      <div
+        ref={lyricsContainerRef}
+        className="lyrics-wrapper"
+        key={media?.title + media?.artist}
+      >
+        {loading ? (
+          <div className="loading">
+            <div className="spinner" />
+          </div>
+        ) : !lyricsResult ? (
+          <div className="no-lyrics">
+            <p>No lyrics found.</p>
+          </div>
+        ) : lyricsResult.synced ? (
+          <div className="synced-lyrics">
+            {syncedLyrics.map((line, index) => {
+              const isActive = activeLineIndex === index;
+              return (
+                <div
+                  key={line.ts}
+                  ref={isActive ? activeLineRef : null}
+                  className={`line ${isActive ? "active" : ""}`}
+                >
+                  {line.l.map((word, wIdx) => {
+                    // word time in ms
+                    const wordStart = (line.ts + word.o) * 1000;
+                    const nextWord = line.l[wIdx + 1];
+
+                    const wordEnd = nextWord
+                      ? (line.ts + nextWord.o) * 1000
+                      : line.te * 1000;
+
+                    const isWordActive =
+                      precisePosition >= wordStart && precisePosition < wordEnd;
+
+                    // progress through current word (0 → 1)
+                    let progress = 0;
+                    if (precisePosition >= wordEnd) {
+                      progress = 1;
+                    } else if (isWordActive) {
+                      progress = Math.min(
+                        1,
+                        (precisePosition - wordStart) / (wordEnd - wordStart),
+                      );
+                    }
+
+                    return (
+                      <span
+                        key={wIdx}
+                        className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
+                        style={
+                          {
+                            "--progress": progress,
+                          } as React.CSSProperties
+                        }
+                      >
+                        {word.c}&nbsp;
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="plain-lyrics">
+            <pre>{lyricsResult.plainLyrics}</pre>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
