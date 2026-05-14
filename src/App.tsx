@@ -245,6 +245,10 @@ function App() {
                       `hsl(${h}, ${s}%, 70%)`,
                     );
                     document.documentElement.style.setProperty(
+                      "--text-muted",
+                      `hsl(${h}, ${s}%, 50%)`,
+                    );
+                    document.documentElement.style.setProperty(
                       "--accent",
                       `hsl(${h}, ${s}%, 90%)`,
                     );
