@@ -2,6 +2,7 @@ import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getColor } from "colorthief";
 
 interface LyricsResponse {
   plainLyrics: string;
@@ -78,11 +79,13 @@ function App() {
   const [media, setMedia] = useState<Media | null>(null);
   const [lyricsNotFound, setLyricsNotFound] = useState(false);
   const [synced, setSynced] = useState<boolean>(false);
+  const [richsynced, setRichsynced] = useState<boolean>(false);
   const [plainLyrics, setPlainLyrics] = useState<string>("");
   const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
   const [precisePosition, setPrecisePosition] = useState(0);
   const activeLineRef = useRef<HTMLDivElement>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef(null);
 
   // initial setup
   useEffect(() => {
@@ -116,6 +119,7 @@ function App() {
     setSyncedLyrics([]);
     setCurrentPosition(0);
     setSynced(false);
+    setRichsynced(false);
     setLyricsNotFound(false);
 
     if (lyricsContainerRef.current) {
@@ -147,7 +151,7 @@ function App() {
           if (!result.richsynced) {
             parsedLyrics = convertLyrics(parsedLyrics);
           }
-
+          setRichsynced(result.richsynced);
           setSyncedLyrics(parsedLyrics);
         } else {
           setPlainLyrics(result.plainLyrics);
@@ -219,15 +223,42 @@ function App() {
           <div className="album-section">
             {media.thumbnail && (
               <img
+                ref={imgRef}
                 className="album-thumbnail"
                 src={`data:image/jpeg;base64,${media.thumbnail}`}
                 alt="thumbnail"
+                onLoad={async (e) => {
+                  try {
+                    const result = await getColor(e.currentTarget);
+                    if (!result) return;
+                    const { h, s } = result.hsl();
+                    document.documentElement.style.setProperty(
+                      "--bg",
+                      `hsl(${h}, ${s}%, 20%)`,
+                    );
+                    document.documentElement.style.setProperty(
+                      "--text-primary",
+                      `hsl(${h}, ${s}%, 90%)`,
+                    );
+                    document.documentElement.style.setProperty(
+                      "--text-secondary",
+                      `hsl(${h}, ${s}%, 70%)`,
+                    );
+                    document.documentElement.style.setProperty(
+                      "--accent",
+                      `hsl(${h}, ${s}%, 90%)`,
+                    );
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
               />
             )}
             <div>
               <div className="title">{media.title}</div>
               <div className="artist">{media.artist}</div>
               <div className="album-name">{media.album}</div>
+              {richsynced && <p className="richsynced">Richsynced</p>}
             </div>
           </div>
 
