@@ -6,15 +6,26 @@ pub fn set_discord_rpc(
     state: tauri::State<DiscordState>,
     details: Option<String>,
     state_msg: Option<String>,
+    start_time: Option<i64>,
+    end_time: Option<i64>,
 ) -> Result<(), String> {
     let mut client_lock = state.client.lock().map_err(|_| "Failed to lock mutex")?;
 
     if let Some(client) = client_lock.as_mut() {
         let mut payload = activity::Activity::new();
+        let mut timestamps = activity::Timestamps::new();
 
-        let timestamps = activity::Timestamps::new().start(state.start_time);
-        payload = payload.timestamps(timestamps);
-        payload = payload.activity_type(activity::ActivityType::Watching);
+        if let Some(start) = start_time {
+            timestamps = timestamps.start(start);
+        }
+
+        if let Some(end) = end_time {
+            timestamps = timestamps.end(end);
+        }
+
+        payload = payload
+            .timestamps(timestamps)
+            .activity_type(activity::ActivityType::Listening);
 
         if let Some(ref d) = details {
             payload = payload.details(d);
@@ -24,7 +35,6 @@ pub fn set_discord_rpc(
         }
 
         client.set_activity(payload).map_err(|e| e.to_string())?;
-
         Ok(())
     } else {
         Err("Discord client not initialized".to_string())

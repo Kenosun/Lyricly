@@ -165,9 +165,18 @@ function App() {
         }
 
         // update discord RPC
+        const nowInSeconds = Math.floor(Date.now() / 1000);
+        const positionInSeconds = currentPosition / 1000;
+        const durationInSeconds = media.duration / 1000;
+
+        const songStartTime = Math.floor(nowInSeconds - positionInSeconds);
+        const songEndTime = Math.floor(songStartTime + durationInSeconds);
+
         invoke("set_discord_rpc", {
-          details: media.title,
-          stateMsg: media.artist,
+          details: media.artist + " - " + media.title,
+          stateMsg: "Singing along",
+          startTime: songStartTime,
+          endTime: songEndTime,
         }).catch(console.error);
       }
 
