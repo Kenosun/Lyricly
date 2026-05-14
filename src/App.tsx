@@ -6,9 +6,20 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-interface LyricsResponse {
-  plainLyrics: string;
-  syncedLyrics: LyricLine[];
+export interface LyricsResponse {
+  // Metadata
+  title: string;
+  artist: string;
+  albumName: string;
+  albumCoverLink?: string;
+  musixmatchLink?: string;
+  spotifyLink?: string;
+
+  // Lyrics
+  plainLyrics?: string;
+  syncedLyrics?: LyricLine[] | string;
+
+  // Status
   synced: boolean;
   richsynced: boolean;
   failed: boolean;
@@ -161,7 +172,9 @@ function App() {
           setRichsynced(result.richsynced);
           setSyncedLyrics(parsedLyrics);
         } else {
-          setPlainLyrics(result.plainLyrics);
+          if (result.plainLyrics) {
+            setPlainLyrics(result.plainLyrics);
+          }
         }
 
         // update discord RPC
@@ -173,10 +186,14 @@ function App() {
         const songEndTime = Math.floor(songStartTime + durationInSeconds);
 
         invoke("set_discord_rpc", {
-          details: media.artist + " - " + media.title,
-          stateMsg: "Singing along",
+          details: result.title,
+          stateMsg: result.artist,
           startTime: songStartTime,
           endTime: songEndTime,
+          albumName: result.albumName,
+          albumCoverLink: result.albumCoverLink,
+          musixmatchLink: result.musixmatchLink,
+          spotifyLink: result.spotifyLink,
         }).catch(console.error);
       }
 
