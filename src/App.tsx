@@ -1,12 +1,12 @@
 import "./App.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LyricLine } from "./types/LyricLine";
 import { LyricsResponse } from "./types/LyricsResponse";
 import { Media } from "./types/Media";
-import { convertSubtitleLyrics } from "./utils/convertSubtitleLyrics";
+import { SubtitleLine } from "./types/SubtitleLine";
 import { updateDiscordRPC } from "./utils/updateDiscordRPC";
 import { getColor } from "colorthief";
 import { Maximize, Minimize } from "lucide-react";
@@ -17,15 +17,16 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [media, setMedia] = useState<Media | null>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [lyricsResult, setLyricsResult] = useState<LyricsResponse | null>(null);
-  const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
+  const [syncedLyrics, setSyncedLyrics] = useState<
+    (LyricLine | SubtitleLine)[]
+  >([]);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [currentPosition, setCurrentPosition] = useState<number>(0);
   const [precisePosition, setPrecisePosition] = useState(0);
 
-  const imgRef = useRef(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -36,9 +37,19 @@ function App() {
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
-      const start = syncedLyrics[mid].ts * 1000;
+      const currentLine = syncedLyrics[mid];
+
+      const start =
+        "ts" in currentLine
+          ? currentLine.ts * 1000
+          : currentLine.time.total * 1000;
       const nextLine = syncedLyrics[mid + 1];
-      const end = nextLine ? nextLine.ts * 1000 : Infinity;
+
+      let end = Infinity;
+      if (nextLine) {
+        end =
+          "ts" in nextLine ? nextLine.ts * 1000 : nextLine.time.total * 1000;
+      }
 
       if (precisePosition >= start && precisePosition < end) {
         return mid;
@@ -48,7 +59,6 @@ function App() {
         low = mid + 1;
       }
     }
-
     return -1;
   }, [syncedLyrics, precisePosition]);
 
@@ -82,47 +92,57 @@ function App() {
     );
   };
 
-  // scroll to active line
+  // Tauri event listeners
   useEffect(() => {
-    if (activeLineRef.current && activeLineIndex !== -1) {
-      activeLineRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [activeLineIndex]);
+    let active = true;
+    const unlistenCleanups: (() => void)[] = [];
 
-  // initial setup
-  useEffect(() => {
-    let unlistenMedia: UnlistenFn;
-    let unlistenPosition: UnlistenFn;
     async function setupListeners() {
-      // trigger backend loops
-      invoke("fetch_media_loop").catch(console.error);
-      invoke("fetch_position_loop").catch(console.error);
+      try {
+        // trigger backend loops
+        invoke("fetch_media_loop").catch(console.error);
+        invoke("fetch_position_loop").catch(console.error);
 
-      // listen for the events the loops will emit
-      unlistenMedia = await listen<Media>("update_media", (event) => {
-        setMedia((prev) => {
-          if (
-            prev?.title === event.payload.title &&
-            prev?.artist === event.payload.artist &&
-            prev?.album === event.payload.album
-          ) {
-            return prev;
-          }
-
-          return event.payload;
+        // listen for the events the loops will emit
+        const unlistenMedia = await listen<Media>("update_media", (event) => {
+          setMedia((prev) => {
+            if (
+              prev?.title === event.payload.title &&
+              prev?.artist === event.payload.artist &&
+              prev?.album === event.payload.album
+            ) {
+              return prev;
+            }
+            return event.payload;
+          });
         });
-      });
-      unlistenPosition = await listen<number>("update_position", (event) => {
-        setCurrentPosition(event.payload);
-      });
+        if (!active) {
+          unlistenMedia();
+          return;
+        }
+        unlistenCleanups.push(unlistenMedia);
+
+        const unlistenPosition = await listen<number>(
+          "update_position",
+          (event) => {
+            setCurrentPosition(event.payload);
+          },
+        );
+        if (!active) {
+          unlistenPosition();
+          return;
+        }
+        unlistenCleanups.push(unlistenPosition);
+      } catch (err) {
+        console.error("Failed to setup Tauri event listeners:", err);
+      }
     }
+
     setupListeners();
+
     return () => {
-      if (unlistenMedia) unlistenMedia();
-      if (unlistenPosition) unlistenPosition();
+      active = false;
+      unlistenCleanups.forEach((cleanup) => cleanup());
     };
   }, []);
 
@@ -133,17 +153,28 @@ function App() {
     setLyricsResult(null);
     setSyncedLyrics([]);
 
-    if (!media) {
-      setCurrentPosition(0);
-      return;
-    }
-
-    setCurrentPosition(media.position);
-
     if (lyricsContainerRef.current) {
       lyricsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
 
+    if (!media) {
+      setCurrentPosition(0);
+      return;
+    }
+    setCurrentPosition(media.position);
+
+    // update thumbnail
+    let url: string | null = null;
+    if (media?.thumbnail) {
+      const byteArray = new Uint8Array(media.thumbnail);
+      const blob = new Blob([byteArray], { type: "image/jpeg" });
+      url = URL.createObjectURL(blob);
+      setThumbnailUrl(url);
+    } else {
+      setThumbnailUrl(null);
+    }
+
+    // fetch lyrics
     const fetchLyrics = async () => {
       try {
         const result = await invoke<LyricsResponse>("fetch_lyrics", {
@@ -160,10 +191,6 @@ function App() {
               ? JSON.parse(result.syncedLyrics)
               : result.syncedLyrics;
 
-          if (!result.richsynced) {
-            parsedLyrics = convertSubtitleLyrics(parsedLyrics);
-          }
-
           setSyncedLyrics(parsedLyrics);
         }
       } catch {
@@ -173,9 +200,15 @@ function App() {
       }
     };
     fetchLyrics();
+
+    return () => {
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
+    };
   }, [media?.title, media?.artist]);
 
-  // sync position
+  // sync current position
   useEffect(() => {
     if (!lyricsResult || currentPosition === -1) {
       return;
@@ -192,12 +225,22 @@ function App() {
     };
 
     if (lyricsResult.synced) {
-      // only run while the music is actually moving
+      // only run while the music is actually playing
       frameId = requestAnimationFrame(sync);
     }
 
     return () => cancelAnimationFrame(frameId);
   }, [currentPosition, lyricsResult]);
+
+  // scroll to active line
+  useEffect(() => {
+    if (activeLineRef.current && activeLineIndex !== -1) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex]);
 
   // update discord rpc
   useEffect(() => {
@@ -208,25 +251,6 @@ function App() {
     updateDiscordRPC(lyricsResult, media, currentPosition);
   }, [currentPosition, media?.title, lyricsResult]);
 
-  // create thumbnail
-  useEffect(() => {
-    if (!media?.thumbnail) return;
-
-    const byteArray = new Uint8Array(media.thumbnail);
-
-    const blob = new Blob([byteArray], {
-      type: "image/jpeg",
-    });
-
-    const url = URL.createObjectURL(blob);
-
-    setThumbnailUrl(url);
-
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [media?.thumbnail]);
-
   if (!media) return <main className="empty-state">Nothing is playing.</main>;
 
   return (
@@ -236,11 +260,10 @@ function App() {
       </button>
 
       <section className="album-section">
-        {media.thumbnail && (
+        {media.thumbnail && thumbnailUrl !== null && (
           <img
-            ref={imgRef}
             className="album-thumbnail"
-            src={thumbnailUrl ?? undefined}
+            src={thumbnailUrl}
             alt="thumbnail"
             onLoad={handleImageLoad}
           />
@@ -270,49 +293,60 @@ function App() {
           <div className="synced-lyrics">
             {syncedLyrics.map((line, index) => {
               const isActive = activeLineIndex === index;
+              const lineKey =
+                "ts" in line ? line.ts : line.time.total * 1000 + index;
+              const lyricText =
+                "text" in line ? line.text : (line as any).lyric || "";
               return (
                 <div
-                  key={line.ts}
+                  key={lineKey}
                   ref={isActive ? activeLineRef : null}
                   className={`line ${isActive ? "active" : ""}`}
                 >
-                  {line.l.map((word, wIdx) => {
-                    // word time in ms
-                    const wordStart = (line.ts + word.o) * 1000;
-                    const nextWord = line.l[wIdx + 1];
+                  {lyricsResult.richsynced && "l" in line ? (
+                    // richsynced lyrics: word-by-word highlight
+                    line.l.map((word, wIdx) => {
+                      // word time in ms
+                      const wordStart = (line.ts + word.o) * 1000;
+                      const nextWord = line.l[wIdx + 1];
 
-                    const wordEnd = nextWord
-                      ? (line.ts + nextWord.o) * 1000
-                      : line.te * 1000;
+                      const wordEnd = nextWord
+                        ? (line.ts + nextWord.o) * 1000
+                        : line.te * 1000;
 
-                    const isWordActive =
-                      precisePosition >= wordStart && precisePosition < wordEnd;
+                      const isWordActive =
+                        precisePosition >= wordStart &&
+                        precisePosition < wordEnd;
 
-                    // progress through current word (0 → 1)
-                    let progress = 0;
-                    if (precisePosition >= wordEnd) {
-                      progress = 1;
-                    } else if (isWordActive) {
-                      progress = Math.min(
-                        1,
-                        (precisePosition - wordStart) / (wordEnd - wordStart),
+                      // progress through current word (0 → 1)
+                      let progress = 0;
+                      if (precisePosition >= wordEnd) {
+                        progress = 1;
+                      } else if (isWordActive) {
+                        progress = Math.min(
+                          1,
+                          (precisePosition - wordStart) / (wordEnd - wordStart),
+                        );
+                      }
+
+                      return (
+                        <span
+                          key={wIdx}
+                          className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
+                          style={
+                            {
+                              "--progress": progress,
+                            } as React.CSSProperties
+                          }
+                        >
+                          {word.c}&nbsp;
+                        </span>
                       );
-                    }
-
-                    return (
-                      <span
-                        key={wIdx}
-                        className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
-                        style={
-                          {
-                            "--progress": progress,
-                          } as React.CSSProperties
-                        }
-                      >
-                        {word.c}&nbsp;
-                      </span>
-                    );
-                  })}
+                    })
+                  ) : (
+                    // subtitle lyrics: display whole line
+                    <span>{lyricText}</span>
+                  )}
                 </div>
               );
             })}
