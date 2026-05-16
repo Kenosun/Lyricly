@@ -117,10 +117,12 @@ function App() {
             return event.payload;
           });
         });
+
         if (!active) {
           unlistenMedia();
           return;
         }
+
         unlistenCleanups.push(unlistenMedia);
 
         const unlistenPosition = await listen<number>(
@@ -149,6 +151,9 @@ function App() {
 
   // on media change
   useEffect(() => {
+    // ignore flag for async race conditions
+    let active = true;
+
     // reset everything
     setLoading(true);
     setLyricsResult(null);
@@ -160,13 +165,15 @@ function App() {
 
     if (!media) {
       setCurrentPosition(0);
+      setThumbnailUrl(null);
       return;
     }
+
     setCurrentPosition(media.position);
 
     // update thumbnail
     let url: string | null = null;
-    if (media?.thumbnail) {
+    if (media.thumbnail && media.thumbnail.length > 0) {
       const byteArray = new Uint8Array(media.thumbnail);
       const blob = new Blob([byteArray], { type: "image/jpeg" });
       url = URL.createObjectURL(blob);
@@ -183,6 +190,9 @@ function App() {
           title: media.title,
           duration: media.duration,
         });
+
+        // if the user skipped to another song, abort
+        if (!active) return;
 
         setLyricsResult(result);
 
@@ -221,7 +231,7 @@ function App() {
                 // calculate the gap between lines
                 const gap = currentStart - prevEnd;
 
-                // if the instrumental gap is larger than 10 seconds, inject an empty line
+                // if the instrumental gap is larger than the threshold, add an empty line
                 if (gap > THRESHOLD_MS) {
                   processedLyrics.push({
                     ts: prevEnd / 1000 + 2,
@@ -240,20 +250,23 @@ function App() {
           }
           setSyncedLyrics(processedLyrics);
         }
-      } catch {
-        setLyricsResult(null);
+      } catch (err) {
+        console.error("Lyrics fetch failed:", err);
+        if (active) setLyricsResult(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
+
     fetchLyrics();
 
     return () => {
+      active = false;
       if (url) {
         URL.revokeObjectURL(url);
       }
     };
-  }, [media?.title, media?.artist]);
+  }, [media?.title, media?.artist, media?.thumbnail]);
 
   // sync current position
   useEffect(() => {
@@ -326,7 +339,7 @@ function App() {
       <div
         ref={lyricsContainerRef}
         className="lyrics-wrapper"
-        key={media?.title + media?.artist}
+        key={`${media?.title}-${media?.artist}-${media?.album}`}
       >
         {loading ? (
           <div className="loading">
