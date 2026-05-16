@@ -17,6 +17,7 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [media, setMedia] = useState<Media | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [lyricsResult, setLyricsResult] = useState<LyricsResponse | null>(null);
   const [syncedLyrics, setSyncedLyrics] = useState<LyricLine[]>([]);
 
@@ -27,6 +28,69 @@ function App() {
   const imgRef = useRef(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+
+  // find active line using binary search
+  const activeLineIndex = useMemo(() => {
+    let low = 0;
+    let high = syncedLyrics.length - 1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const start = syncedLyrics[mid].ts * 1000;
+      const nextLine = syncedLyrics[mid + 1];
+      const end = nextLine ? nextLine.ts * 1000 : Infinity;
+
+      if (precisePosition >= start && precisePosition < end) {
+        return mid;
+      } else if (precisePosition < start) {
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    return -1;
+  }, [syncedLyrics, precisePosition]);
+
+  const toggleFullscreen = async () => {
+    const state = await window.isFullscreen();
+    await window.setFullscreen(!state);
+    setIsFullscreen(!state);
+  };
+
+  const handleImageLoad = async (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const result = await getColor(e.currentTarget);
+    if (!result) return;
+
+    const { h, s } = result.hsl();
+    document.documentElement.style.setProperty("--bg", `hsl(${h}, ${s}%, 20%)`);
+    document.documentElement.style.setProperty(
+      "--text-primary",
+      `hsl(${h}, ${s}%, 90%)`,
+    );
+    document.documentElement.style.setProperty(
+      "--text-secondary",
+      `hsl(${h}, ${s}%, 70%)`,
+    );
+    document.documentElement.style.setProperty(
+      "--text-muted",
+      `hsl(${h}, ${s}%, 50%)`,
+    );
+    document.documentElement.style.setProperty(
+      "--accent",
+      `hsl(${h}, ${s}%, 90%)`,
+    );
+  };
+
+  // scroll to active line
+  useEffect(() => {
+    if (activeLineRef.current && activeLineIndex !== -1) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [activeLineIndex]);
 
   // initial setup
   useEffect(() => {
@@ -39,7 +103,17 @@ function App() {
 
       // listen for the events the loops will emit
       unlistenMedia = await listen<Media>("update_media", (event) => {
-        setMedia(event.payload);
+        setMedia((prev) => {
+          if (
+            prev?.title === event.payload.title &&
+            prev?.artist === event.payload.artist &&
+            prev?.album === event.payload.album
+          ) {
+            return prev;
+          }
+
+          return event.payload;
+        });
       });
       unlistenPosition = await listen<number>("update_position", (event) => {
         setCurrentPosition(event.payload);
@@ -71,32 +145,35 @@ function App() {
     }
 
     const fetchLyrics = async () => {
-      const result = await invoke<LyricsResponse>("fetch_lyrics", {
-        artist: media.artist,
-        title: media.title,
-        duration: media.duration,
-      });
+      try {
+        const result = await invoke<LyricsResponse>("fetch_lyrics", {
+          artist: media.artist,
+          title: media.title,
+          duration: media.duration,
+        });
 
-      setLyricsResult(result);
+        setLyricsResult(result);
 
-      if (result.synced) {
-        // parse the string into an object/array
-        let parsedLyrics =
-          typeof result.syncedLyrics === "string"
-            ? JSON.parse(result.syncedLyrics)
-            : result.syncedLyrics;
+        if (result?.synced) {
+          let parsedLyrics =
+            typeof result.syncedLyrics === "string"
+              ? JSON.parse(result.syncedLyrics)
+              : result.syncedLyrics;
 
-        if (!result.richsynced) {
-          parsedLyrics = convertSubtitleLyrics(parsedLyrics);
+          if (!result.richsynced) {
+            parsedLyrics = convertSubtitleLyrics(parsedLyrics);
+          }
+
+          setSyncedLyrics(parsedLyrics);
         }
-
-        setSyncedLyrics(parsedLyrics);
+      } catch {
+        setLyricsResult(null);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
     fetchLyrics();
-  }, [media]);
+  }, [media?.title, media?.artist]);
 
   // sync position
   useEffect(() => {
@@ -122,39 +199,6 @@ function App() {
     return () => cancelAnimationFrame(frameId);
   }, [currentPosition, lyricsResult]);
 
-  // find active line using binary search
-  const activeLineIndex = useMemo(() => {
-    let low = 0;
-    let high = syncedLyrics.length - 1;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      const start = syncedLyrics[mid].ts * 1000;
-      const nextLine = syncedLyrics[mid + 1];
-      const end = nextLine ? nextLine.ts * 1000 : Infinity;
-
-      if (precisePosition >= start && precisePosition < end) {
-        return mid;
-      } else if (precisePosition < start) {
-        high = mid - 1;
-      } else {
-        low = mid + 1;
-      }
-    }
-
-    return -1;
-  }, [syncedLyrics, precisePosition]);
-
-  // scroll to active line
-  useEffect(() => {
-    if (activeLineRef.current && activeLineIndex !== -1) {
-      activeLineRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [activeLineIndex]);
-
   // update discord rpc
   useEffect(() => {
     if (currentPosition === -1 || !media || !lyricsResult) {
@@ -164,41 +208,24 @@ function App() {
     updateDiscordRPC(lyricsResult, media, currentPosition);
   }, [currentPosition, media?.title, lyricsResult]);
 
-  const toggleFullscreen = async () => {
-    const state = await window.isFullscreen();
-    await window.setFullscreen(!state);
-    setIsFullscreen(!state);
-  };
+  // create thumbnail
+  useEffect(() => {
+    if (!media?.thumbnail) return;
 
-  const handleImageLoad = async (e: React.SyntheticEvent<HTMLImageElement>) => {
-    try {
-      const result = await getColor(e.currentTarget);
-      if (!result) return;
-      const { h, s } = result.hsl();
-      document.documentElement.style.setProperty(
-        "--bg",
-        `hsl(${h}, ${s}%, 20%)`,
-      );
-      document.documentElement.style.setProperty(
-        "--text-primary",
-        `hsl(${h}, ${s}%, 90%)`,
-      );
-      document.documentElement.style.setProperty(
-        "--text-secondary",
-        `hsl(${h}, ${s}%, 70%)`,
-      );
-      document.documentElement.style.setProperty(
-        "--text-muted",
-        `hsl(${h}, ${s}%, 50%)`,
-      );
-      document.documentElement.style.setProperty(
-        "--accent",
-        `hsl(${h}, ${s}%, 90%)`,
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
+    const byteArray = new Uint8Array(media.thumbnail);
+
+    const blob = new Blob([byteArray], {
+      type: "image/jpeg",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    setThumbnailUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [media?.thumbnail]);
 
   if (!media) return <main className="empty-state">Nothing is playing.</main>;
 
@@ -213,7 +240,7 @@ function App() {
           <img
             ref={imgRef}
             className="album-thumbnail"
-            src={`data:image/jpeg;base64,${media.thumbnail}`}
+            src={thumbnailUrl ?? undefined}
             alt="thumbnail"
             onLoad={handleImageLoad}
           />

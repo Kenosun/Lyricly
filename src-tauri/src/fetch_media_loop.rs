@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose, Engine};
 use serde::Serialize;
 use std::time::Duration;
 use tauri::Emitter;
@@ -14,7 +13,7 @@ struct Track {
     duration: f64,
     position: f64,
     album: String,
-    thumbnail: String,
+    thumbnail: Vec<u8>,
 }
 
 #[tauri::command]
@@ -67,7 +66,7 @@ pub fn fetch_media_loop(app: tauri::AppHandle) {
                                 .unwrap_or("Unknown Album".into())
                                 .to_string_lossy();
 
-                            let mut thumbnail = String::new();
+                            let mut thumbnail = vec![];
                             if let Ok(reference) = media_props.Thumbnail() {
                                 if let Ok(operation) = reference.OpenReadAsync() {
                                     if let Ok(stream) = operation.await {
@@ -76,7 +75,7 @@ pub fn fetch_media_loop(app: tauri::AppHandle) {
                                         reader.LoadAsync(size as u32).unwrap().await.unwrap();
                                         let mut buffer = vec![0u8; size as usize];
                                         reader.ReadBytes(&mut buffer).unwrap();
-                                        thumbnail = general_purpose::STANDARD.encode(buffer);
+                                        thumbnail = buffer;
                                     }
                                 }
                             }

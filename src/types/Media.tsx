@@ -4,5 +4,5 @@ export interface Media {
   duration: number;
   position: number;
   album: string;
-  thumbnail: string;
+  thumbnail: number[];
 }
