@@ -11,6 +11,7 @@ import { formatLyrics } from "./utils/formatLyrics";
 import { updateDiscordRPC } from "./utils/updateDiscordRPC";
 import { getColor } from "colorthief";
 import { Maximize, Minimize } from "lucide-react";
+import { getLineMs } from "./utils/getLineMs";
 
 function App() {
   // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -30,27 +31,19 @@ function App() {
 
   const activeLineRef = useRef<HTMLDivElement>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const prevActiveLineRef = useRef<number>(-1);
+  const prevPositionRef = useRef<number>(0);
 
-  // find active line using binary search
+  // Find active line using binary search
   const activeLineIndex = useMemo(() => {
     let low = 0;
     let high = syncedLyrics.length - 1;
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
-      const currentLine = syncedLyrics[mid];
-
-      const start =
-        "ts" in currentLine
-          ? currentLine.ts * 1000
-          : currentLine.time.total * 1000;
+      const start = getLineMs(syncedLyrics[mid]);
       const nextLine = syncedLyrics[mid + 1];
-
-      let end = Infinity;
-      if (nextLine) {
-        end =
-          "ts" in nextLine ? nextLine.ts * 1000 : nextLine.time.total * 1000;
-      }
+      const end = nextLine ? getLineMs(nextLine) : Infinity;
 
       if (precisePosition >= start && precisePosition < end) {
         return mid;
@@ -74,23 +67,12 @@ function App() {
     if (!result) return;
 
     const { h, s } = result.hsl();
-    document.documentElement.style.setProperty("--bg", `hsl(${h}, ${s}%, 20%)`);
-    document.documentElement.style.setProperty(
-      "--text-primary",
-      `hsl(${h}, ${s}%, 90%)`,
-    );
-    document.documentElement.style.setProperty(
-      "--text-secondary",
-      `hsl(${h}, ${s}%, 70%)`,
-    );
-    document.documentElement.style.setProperty(
-      "--text-muted",
-      `hsl(${h}, ${s}%, 50%)`,
-    );
-    document.documentElement.style.setProperty(
-      "--accent",
-      `hsl(${h}, ${s}%, 90%)`,
-    );
+    const docStyle = document.documentElement.style;
+    docStyle.setProperty("--bg", `hsl(${h}, ${s}%, 20%)`);
+    docStyle.setProperty("--text-primary", `hsl(${h}, ${s}%, 90%)`);
+    docStyle.setProperty("--text-secondary", `hsl(${h}, ${s}%, 70%)`);
+    docStyle.setProperty("--text-muted", `hsl(${h}, ${s}%, 50%)`);
+    docStyle.setProperty("--accent", `hsl(${h}, ${s}%, 90%)`);
   };
 
   // Tauri event listeners
@@ -117,13 +99,7 @@ function App() {
             return event.payload;
           });
         });
-
-        if (!active) {
-          unlistenMedia();
-          return;
-        }
-
-        unlistenCleanups.push(unlistenMedia);
+        if (active) unlistenCleanups.push(unlistenMedia);
 
         const unlistenPosition = await listen<number>(
           "update_position",
@@ -131,11 +107,7 @@ function App() {
             setCurrentPosition(event.payload);
           },
         );
-        if (!active) {
-          unlistenPosition();
-          return;
-        }
-        unlistenCleanups.push(unlistenPosition);
+        if (active) unlistenCleanups.push(unlistenPosition);
       } catch (err) {
         console.error("Failed to setup Tauri event listeners:", err);
       }
@@ -149,7 +121,7 @@ function App() {
     };
   }, []);
 
-  // on media change
+  // Handle lyrics loading & parsing on media changes
   useEffect(() => {
     // ignore flag for async race conditions
     let active = true;
@@ -158,14 +130,13 @@ function App() {
     setLoading(true);
     setLyricsResult(null);
     setSyncedLyrics([]);
-
-    if (lyricsContainerRef.current) {
-      lyricsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    prevActiveLineRef.current = -1;
+    lyricsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
     if (!media) {
       setCurrentPosition(0);
       setThumbnailUrl(null);
+      setLoading(false);
       return;
     }
 
@@ -213,33 +184,17 @@ function App() {
 
               if (i > 0) {
                 const prevLine = parsedLyrics[i - 1];
-
-                // get the end time of the previous line
                 const prevEnd =
-                  "te" in prevLine
-                    ? prevLine.te * 1000
-                    : "ts" in prevLine
-                      ? prevLine.ts * 1000
-                      : prevLine.time.total * 1000;
+                  "te" in prevLine ? prevLine.te * 1000 : getLineMs(prevLine);
+                const currentStart = getLineMs(currentLine);
 
-                // get the start time of the current line
-                const currentStart =
-                  "ts" in currentLine
-                    ? currentLine.ts * 1000
-                    : currentLine.time.total * 1000;
-
-                // calculate the gap between lines
-                const gap = currentStart - prevEnd;
-
-                // if the instrumental gap is larger than the threshold, add an empty line
-                if (gap > THRESHOLD_MS) {
+                // if the gap is larger than the threshold, add an empty line
+                if (currentStart - prevEnd > THRESHOLD_MS) {
                   processedLyrics.push({
                     ts: prevEnd / 1000 + 2,
                     te: currentStart / 1000,
                     text: "",
-                    time: {
-                      total: prevEnd / 1000,
-                    },
+                    time: { total: prevEnd / 1000 },
                   } as any);
                 }
               }
@@ -268,19 +223,22 @@ function App() {
     };
   }, [media?.title, media?.artist, media?.thumbnail]);
 
-  // sync current position
+  // Track position frame updates
   useEffect(() => {
-    if (!lyricsResult || currentPosition === -1) {
-      return;
+    if (!lyricsResult || currentPosition === -1) return;
+
+    // detect manual user skips or large jumps backwards
+    if (prevPositionRef.current - currentPosition > 2000) {
+      lyricsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
+    prevPositionRef.current = currentPosition;
 
     let frameId: number;
     const startTime = performance.now();
     const offset = currentPosition;
 
     const sync = () => {
-      const elapsed = performance.now() - startTime;
-      setPrecisePosition(offset + elapsed);
+      setPrecisePosition(offset + (performance.now() - startTime));
       frameId = requestAnimationFrame(sync);
     };
 
@@ -292,17 +250,54 @@ function App() {
     return () => cancelAnimationFrame(frameId);
   }, [currentPosition, lyricsResult]);
 
-  // scroll to active line
+  // Handle scrolling
   useEffect(() => {
-    if (activeLineRef.current && activeLineIndex !== -1) {
-      activeLineRef.current.scrollIntoView({
+    if (!lyricsContainerRef.current) return;
+
+    // handle active line highlighting
+    if (
+      activeLineIndex !== -1 &&
+      activeLineIndex !== prevActiveLineRef.current
+    ) {
+      prevActiveLineRef.current = activeLineIndex;
+      activeLineRef.current?.scrollIntoView({
         behavior: "smooth",
         block: "center",
       });
+      return;
     }
-  }, [activeLineIndex]);
 
-  // update discord rpc
+    // handle intro/track looping
+    if (
+      activeLineIndex === -1 &&
+      precisePosition < 1000 &&
+      prevActiveLineRef.current !== -1
+    ) {
+      prevActiveLineRef.current = -1;
+      lyricsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // handle song end
+    if (syncedLyrics.length > 0) {
+      const lastLine = syncedLyrics[syncedLyrics.length - 1];
+      const trackEndMs =
+        "te" in lastLine && typeof lastLine.te === "number"
+          ? lastLine.te * 1000
+          : media?.duration || 0;
+
+      if (
+        precisePosition >= trackEndMs &&
+        trackEndMs > 0 &&
+        prevActiveLineRef.current !== -2
+      ) {
+        prevActiveLineRef.current = -2;
+        lyricsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+  }, [activeLineIndex, precisePosition, syncedLyrics, media?.duration]);
+
+  // Update Discord RPC
   useEffect(() => {
     if (currentPosition === -1 || !media || !lyricsResult) {
       invoke("clear_discord_rpc").catch(console.error);
@@ -354,6 +349,7 @@ function App() {
               const rawText =
                 "text" in line ? line.text : (line as any).lyric || "";
               const lyricText = rawText.trim() === "" ? "♪" : rawText;
+
               return (
                 <div
                   key={lineKey}

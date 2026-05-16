@@ -25,9 +25,9 @@ async fn emit_current_position(
             (timeline.Position()?.Duration as f64) / 10_000.0
         };
 
-    if current_pos_ms != *previous_pos_ms {
+    if (current_pos_ms - *previous_pos_ms).abs() >= 50.0 {
         *previous_pos_ms = current_pos_ms;
-        let _ = app.emit(event, current_pos_ms as f64);
+        let _ = app.emit(event, current_pos_ms);
     }
 
     Ok(())

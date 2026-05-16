@@ -80,7 +80,7 @@ pub fn fetch_media_loop(app: tauri::AppHandle) {
                                 }
                             }
 
-                            let current_media = format!("{} - {}", artist, title);
+                            let current_media = format!("{} - {} - {}", artist, title, album);
 
                             if let Ok(timeline) = session.GetTimelineProperties() {
                                 // calculate media position and duration in ms

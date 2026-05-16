@@ -141,6 +141,14 @@ body {
 }
 
 /* Lyrics */
+.lyrics-wrapper {
+  width: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.lyrics-wrapper::-webkit-scrollbar {
+  display: none;
+}
 
 .synced-lyrics {
   --visible-lines: 5;
@@ -152,8 +160,6 @@ body {
   line-height: var(--line-height-multiplier);
 
   max-height: calc((var(--actual-line-height) * var(--visible-lines)));
-  margin-top: var(--space-xxl);
-  overflow: hidden;
 
   width: 100%;
   max-width: 190ch;
