@@ -7,6 +7,7 @@ import { LyricLine } from "./types/LyricLine";
 import { LyricsResponse } from "./types/LyricsResponse";
 import { Media } from "./types/Media";
 import { SubtitleLine } from "./types/SubtitleLine";
+import { formatLyrics } from "./utils/formatLyrics";
 import { updateDiscordRPC } from "./utils/updateDiscordRPC";
 import { getColor } from "colorthief";
 import { Maximize, Minimize } from "lucide-react";
@@ -305,47 +306,75 @@ function App() {
                 >
                   {lyricsResult.richsynced && "l" in line ? (
                     // richsynced lyrics: word-by-word highlight
-                    line.l.map((word, wIdx) => {
-                      // word time in ms
-                      const wordStart = (line.ts + word.o) * 1000;
-                      const nextWord = line.l[wIdx + 1];
+                    (() => {
+                      const totalWords = line.l.length;
 
-                      const wordEnd = nextWord
-                        ? (line.ts + nextWord.o) * 1000
-                        : line.te * 1000;
+                      const renderWord = (word: any, wIdx: number) => {
+                        const wordStart = (line.ts + word.o) * 1000;
+                        const nextWord = line.l[wIdx + 1];
+                        const wordEnd = nextWord
+                          ? (line.ts + nextWord.o) * 1000
+                          : line.te * 1000;
+                        const isWordActive =
+                          precisePosition >= wordStart &&
+                          precisePosition < wordEnd;
 
-                      const isWordActive =
-                        precisePosition >= wordStart &&
-                        precisePosition < wordEnd;
+                        let progress = 0;
+                        if (precisePosition >= wordEnd) {
+                          progress = 1;
+                        } else if (isWordActive) {
+                          progress = Math.min(
+                            1,
+                            (precisePosition - wordStart) /
+                              (wordEnd - wordStart),
+                          );
+                        }
 
-                      // progress through current word (0 → 1)
-                      let progress = 0;
-                      if (precisePosition >= wordEnd) {
-                        progress = 1;
-                      } else if (isWordActive) {
-                        progress = Math.min(
-                          1,
-                          (precisePosition - wordStart) / (wordEnd - wordStart),
+                        return (
+                          <span
+                            key={wIdx}
+                            className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
+                            style={
+                              { "--progress": progress } as React.CSSProperties
+                            }
+                          >
+                            {word.c}&nbsp;
+                          </span>
+                        );
+                      };
+
+                      // if the lyric line has 3 words or fewer, render them normally without nesting
+                      if (totalWords <= 3) {
+                        return line.l.map((word, wIdx) =>
+                          renderWord(word, wIdx),
                         );
                       }
 
+                      // split array into primary segment and final 3 elements
+                      const leadingWords = line.l.slice(0, totalWords - 3);
+                      const trailingWords = line.l.slice(totalWords - 3);
+
                       return (
-                        <span
-                          key={wIdx}
-                          className={`karaoke-word ${isWordActive ? "active-word" : ""}`}
-                          style={
-                            {
-                              "--progress": progress,
-                            } as React.CSSProperties
-                          }
-                        >
-                          {word.c}&nbsp;
-                        </span>
+                        <>
+                          {leadingWords.map((word, wIdx) =>
+                            renderWord(word, wIdx),
+                          )}
+                          <span
+                            style={{
+                              display: "inline-block",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {trailingWords.map((word, wIdx) =>
+                              renderWord(word, totalWords - 3 + wIdx),
+                            )}
+                          </span>
+                        </>
                       );
-                    })
+                    })()
                   ) : (
                     // subtitle lyrics: display whole line
-                    <span>{lyricText}</span>
+                    <span>{formatLyrics(lyricText)}</span>
                   )}
                 </div>
               );

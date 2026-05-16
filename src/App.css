@@ -15,7 +15,7 @@
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2rem;
-  --space-xxl: clamp(4rem, 5vw, 8rem);
+  --space-xxl: clamp(3rem, 5vw, 8rem);
 
   --album-size: clamp(160px, 20vw, 400px);
 
@@ -144,7 +144,7 @@ body {
 
 .synced-lyrics {
   --visible-lines: 5;
-  --line-height-multiplier: 1.4;
+  --line-height-multiplier: 1.5;
   --actual-line-height: calc(
     var(--lyrics-size) * var(--line-height-multiplier)
   );
@@ -152,10 +152,16 @@ body {
   line-height: var(--line-height-multiplier);
 
   max-height: calc((var(--actual-line-height) * var(--visible-lines)));
-
   margin-top: var(--space-xxl);
-
   overflow: hidden;
+
+  width: 100%;
+  max-width: 190ch;
+
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 var(--space-xxl);
+  box-sizing: border-box;
 
   inline-size: 100%;
   overflow-wrap: break-word;
@@ -170,16 +176,19 @@ body {
 .line {
   font-size: var(--lyrics-size);
   line-height: inherit;
-
   text-align: center;
+
+  text-wrap: pretty;
+
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 
   transition:
     opacity var(--transition-fast),
     transform var(--transition-fast),
     color var(--transition-fast),
     font-weight var(--transition-fast);
-
-  will-change: transform, opacity;
 }
 
 .plain-lyrics {
@@ -197,8 +206,6 @@ body {
     transform var(--transition-fast),
     color var(--transition-fast),
     font-weight var(--transition-fast);
-
-  will-change: transform, opacity;
 }
 
 .line.active {
