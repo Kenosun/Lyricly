@@ -192,7 +192,53 @@ function App() {
               ? JSON.parse(result.syncedLyrics)
               : result.syncedLyrics;
 
-          setSyncedLyrics(parsedLyrics);
+          let processedLyrics: (LyricLine | SubtitleLine)[] = [];
+
+          // add an empty line on gaps > 5 seconds
+          if (result.richsynced) {
+            const THRESHOLD_MS = 5000; // 5 seconds in milliseconds
+
+            for (let i = 0; i < parsedLyrics.length; i++) {
+              const currentLine = parsedLyrics[i];
+
+              if (i > 0) {
+                const prevLine = parsedLyrics[i - 1];
+
+                // get the end time of the previous line
+                const prevEnd =
+                  "te" in prevLine
+                    ? prevLine.te * 1000
+                    : "ts" in prevLine
+                      ? prevLine.ts * 1000
+                      : prevLine.time.total * 1000;
+
+                // get the start time of the current line
+                const currentStart =
+                  "ts" in currentLine
+                    ? currentLine.ts * 1000
+                    : currentLine.time.total * 1000;
+
+                // calculate the gap between lines
+                const gap = currentStart - prevEnd;
+
+                // if the instrumental gap is larger than 10 seconds, inject an empty line
+                if (gap > THRESHOLD_MS) {
+                  processedLyrics.push({
+                    ts: prevEnd / 1000 + 2,
+                    te: currentStart / 1000,
+                    text: "",
+                    time: {
+                      total: prevEnd / 1000,
+                    },
+                  } as any);
+                }
+              }
+              processedLyrics.push(currentLine);
+            }
+          } else {
+            processedLyrics = parsedLyrics;
+          }
+          setSyncedLyrics(processedLyrics);
         }
       } catch {
         setLyricsResult(null);
@@ -286,18 +332,15 @@ function App() {
           <div className="loading">
             <div className="spinner" />
           </div>
-        ) : !lyricsResult ? (
-          <div className="no-lyrics">
-            <p>No lyrics found.</p>
-          </div>
-        ) : lyricsResult.synced ? (
+        ) : lyricsResult?.synced ? (
           <div className="synced-lyrics">
             {syncedLyrics.map((line, index) => {
               const isActive = activeLineIndex === index;
               const lineKey =
                 "ts" in line ? line.ts : line.time.total * 1000 + index;
-              const lyricText =
+              const rawText =
                 "text" in line ? line.text : (line as any).lyric || "";
+              const lyricText = rawText.trim() === "" ? "♪" : rawText;
               return (
                 <div
                   key={lineKey}
@@ -380,9 +423,13 @@ function App() {
               );
             })}
           </div>
-        ) : (
+        ) : lyricsResult?.plainLyrics ? (
           <div className="plain-lyrics">
             <pre>{lyricsResult.plainLyrics}</pre>
+          </div>
+        ) : (
+          <div className="no-lyrics">
+            <p>No lyrics found.</p>
           </div>
         )}
       </div>
