@@ -23,12 +23,13 @@
   --artist-size: clamp(1rem, 2.5vw, 2rem);
   --album-name-size: clamp(0.75rem, 2.5vw, 1.5rem);
   --richsynced-size: clamp(0.5rem, 2vw, 1.25rem);
+  --plain-lyrics-size: clamp(0.5rem, 2vw, 2.5rem);
 
   --lyrics-size: clamp(1.5rem, 4vw, 4rem);
 
   --transition-fast: 180ms ease;
 
-  --plain-lyrics-height: 20rem;
+  --plain-lyrics-height: clamp(18rem, 40vh, 40rem);
 }
 
 body {
@@ -178,7 +179,6 @@ body {
   font-weight: 600;
 }
 
-.plain-lyrics,
 .line {
   font-size: var(--lyrics-size);
   line-height: inherit;
@@ -198,7 +198,22 @@ body {
 }
 
 .plain-lyrics {
-  color: var(--text-secondary);
+  font-size: var(--plain-lyrics-size);
+  line-height: 1.8;
+  font-weight: 400;
+
+  color: var(--text-primary);
+
+  max-width: 70ch;
+  margin: 0 auto;
+
+  padding: 0 var(--space-lg);
+
+  text-align: center;
+
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+
   overflow-y: auto;
   max-height: var(--plain-lyrics-height);
 }
